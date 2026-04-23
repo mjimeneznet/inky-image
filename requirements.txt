@@ -1,0 +1,8 @@
+flask
+waitress
+gpiod
+gpiodevice
+inky
+numpy
+pillow
+

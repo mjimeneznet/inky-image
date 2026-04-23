@@ -1,0 +1,19 @@
+[Unit]
+Description=Inky Image Viewer
+After=multi-user.target
+
+[Service]
+Type=simple
+User=__INKY_USER__
+WorkingDirectory=__INKY_TARGET_DIR__
+Environment=PYTHONUNBUFFERED=1
+Environment=INKY_IMAGE_CONFIG_PATH=__INKY_HOME__/.config/inky-image/config.json
+ExecStart=__INKY_TARGET_DIR__/venv/bin/python -m inky_image.main
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=false
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

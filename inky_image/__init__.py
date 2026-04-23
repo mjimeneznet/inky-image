@@ -1,0 +1,2 @@
+"""Inky image viewer package."""
+

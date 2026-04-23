@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Inky Image Viewer</title>
+	<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+	<div id="ui-badge" class="ui-badge" aria-live="polite"></div>
+	<button
+		id="settings-toggle"
+		class="settings-toggle"
+		aria-expanded="false"
+		aria-controls="settings-panel"
+		title="Show settings"
+	>&#9881;</button>
+	<header class="topbar">
+		<div class="topbar-brand">
+			<h1>Inky Image Viewer</h1>
+			<p>Control panel for your e-ink slideshow</p>
+		</div>
+		<div class="topbar-status">
+			<div class="status-chip"><span>Active mode</span><strong id="top-active-mode">Directory</strong></div>
+			<div class="status-chip"><span>Slideshow</span><strong id="top-slideshow-state">stopped</strong></div>
+			<div class="status-chip"><span>Buttons</span><strong id="top-lock-state">unlocked</strong></div>
+			<div class="status-chip"><span>UI</span><strong id="top-ui-state">ready</strong></div>
+		</div>
+	</header>
+	<div id="action-status-bar" class="action-status-bar" hidden>
+		<span class="action-spinner" aria-hidden="true"></span>
+		<span id="action-status-text">Working...</span>
+	</div>
+	<main class="layout">
+		<section class="panel source-panel">
+			<h2>Source manager</h2>
+			<p class="section-help">Select source type and manage items before activating on device.</p>
+			<label>Choose source mode</label>
+			<div id="mode-switch" class="mode-switch" role="group" aria-label="Slideshow source mode">
+				<div class="mode-card" data-mode="directory">
+					<button class="mode-button active" data-mode="directory" aria-pressed="true">Directory mode</button>
+					<button class="mode-activate-button" data-mode="directory" title="Activate Directory mode">Set</button>
+				</div>
+				<div class="mode-card" data-mode="image_list">
+					<button class="mode-button" data-mode="image_list" aria-pressed="false">Image list mode</button>
+					<button class="mode-activate-button" data-mode="image_list" title="Activate Image list mode">Set</button>
+				</div>
+				<div class="mode-card" data-mode="url">
+					<button class="mode-button" data-mode="url" aria-pressed="false">URL mode</button>
+					<button class="mode-activate-button" data-mode="url" title="Activate URL mode">Set</button>
+				</div>
+				<div class="mode-card" data-mode="upload">
+					<button class="mode-button" data-mode="upload" aria-pressed="false">Upload mode</button>
+					<button class="mode-activate-button" data-mode="upload" title="Activate Upload mode">Set</button>
+				</div>
+			</div>
+
+			<div id="browser-mode-panel">
+				<div class="directory-browser">
+					<label for="browser-filter-input">Filter directories</label>
+					<input id="browser-filter-input" type="text" placeholder="Type to filter by path...">
+					<div class="current-path-line">
+						<span>Current path:</span>
+						<code id="current-path-display">/</code>
+					</div>
+					<select id="browser-directories-select" size="14"></select>
+					<button id="add-directory-button">Add current folder</button>
+				</div>
+				<div id="selection-preview-wrapper" class="preview-secondary" hidden>
+					<img id="selected-image-preview" alt="Selected image preview" />
+				</div>
+			</div>
+
+			<div id="directories-section">
+				<h2>Directories</h2>
+				<ul id="directories-list"></ul>
+			</div>
+
+			<div id="selected-images-section" hidden>
+				<h2>Selected images</h2>
+				<div class="row">
+					<button id="clear-images-button">Clear image list</button>
+				</div>
+				<ul id="selected-images-list"></ul>
+			</div>
+
+			<div id="url-mode-panel" hidden>
+				<h2>URL images</h2>
+				<label for="url-image-input">Image URL</label>
+				<input id="url-image-input" type="url" placeholder="https://example.com/image.jpg">
+				<p id="url-validation-message" class="url-validation neutral">Enter a valid http/https image URL.</p>
+				<div class="row url-actions-row">
+					<button id="add-url-image-button">Add URL image</button>
+					<button id="clear-url-images-button">Clear URL list</button>
+				</div>
+				<div id="url-preview-wrapper" class="preview-secondary" hidden>
+					<img id="url-image-preview" alt="URL image preview" />
+					<div id="url-preview-fallback" class="preview-fallback" hidden>
+						<p>Preview unavailable. The remote image may be blocked, unavailable, or not publicly accessible.</p>
+					</div>
+				</div>
+				<ul id="url-images-list"></ul>
+			</div>
+
+			<div id="upload-mode-panel" hidden>
+				<h2>Uploaded images</h2>
+				<label for="upload-image-input">Select image file</label>
+				<input id="upload-image-input" type="file" accept="image/*">
+				<div class="row upload-actions-row">
+					<button id="add-upload-image-button">Upload image</button>
+					<button id="clear-upload-images-button">Clear uploaded list</button>
+				</div>
+				<ul id="upload-images-list"></ul>
+			</div>
+			<div id="list-preview-wrapper" class="preview-secondary" hidden>
+				<img id="list-preview-image" alt="List item preview" />
+				<div id="list-preview-fallback" class="preview-fallback" hidden>
+					<p id="list-preview-message">Preview unavailable.</p>
+				</div>
+			</div>
+		</section>
+
+		<section class="panel now-playing-panel">
+			<h2>Now playing</h2>
+			<p class="section-help">This mirrors the last image rendered on the e-ink display.</p>
+			<div id="preview-wrapper">
+				<img id="current-image-preview" alt="Current image preview" />
+			</div>
+			<p id="current-image-name">No image</p>
+			<div class="controls controls-primary">
+				<button id="prev-button">Previous (C)</button>
+				<button id="toggle-button" class="button-primary">Start/Stop (A)</button>
+				<button id="next-button">Next (B)</button>
+			</div>
+			<div class="controls controls-secondary">
+				<button id="cycle-button">Cycle mode (D)</button>
+				<button id="reshuffle-button">Reshuffle</button>
+			</div>
+		</section>
+
+		<section id="settings-panel" class="panel settings-panel">
+			<h2>Settings</h2>
+			<label for="interval-input">Slideshow interval (seconds)</label>
+			<input id="interval-input" type="number" min="30" step="1">
+
+			<label for="saturation-input">Inky saturation (0.0 - 1.0)</label>
+			<input id="saturation-input" type="number" min="0" max="1" step="0.1">
+
+			<div class="row setting-toggle">
+				<input id="scale-to-fit-input" type="checkbox">
+				<label for="scale-to-fit-input">Scale to fit (crop to fill display)</label>
+			</div>
+			<div class="row setting-toggle">
+				<input id="lock-buttons-input" type="checkbox">
+				<label for="lock-buttons-input">Lock physical buttons (A/B/C/D)</label>
+			</div>
+			<div class="row setting-toggle">
+				<input id="high-contrast-input" type="checkbox">
+				<label for="high-contrast-input">High contrast mode</label>
+			</div>
+			<label for="render-width-input">Render width (pixels)</label>
+			<input id="render-width-input" type="number" min="64" step="1">
+			<label for="render-height-input">Render height (pixels)</label>
+			<input id="render-height-input" type="number" min="64" step="1">
+
+			<button id="save-settings-button">Save settings</button>
+			<pre id="status-output"></pre>
+		</section>
+	</main>
+	<div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+	<div id="command-palette-overlay" class="command-palette-overlay" hidden>
+		<div class="command-palette" role="dialog" aria-modal="true" aria-labelledby="command-palette-title">
+			<div class="command-palette-header">
+				<h2 id="command-palette-title">Quick actions</h2>
+				<button id="command-palette-close" title="Close">Esc</button>
+			</div>
+			<input id="command-palette-input" type="text" placeholder="Type a command..." aria-controls="command-palette-list">
+			<ul id="command-palette-list" role="listbox" aria-label="Available quick actions"></ul>
+		</div>
+	</div>
+
+	<script type="module" src="/static/js/main.js"></script>
+</body>
+</html>
