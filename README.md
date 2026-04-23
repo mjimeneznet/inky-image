@@ -61,6 +61,31 @@ The installer will:
 - Install Python dependencies
 - Install and start `inky-image.service`
 
+## Updating
+
+For normal updates on the Raspberry Pi, pull the latest code and restart the
+service with:
+
+```bash
+cd /home/pi/inky-image
+sudo ./update.sh
+```
+
+The updater will:
+
+- Pull the latest code with `git pull --ff-only`
+- Reinstall Python dependencies when `requirements.txt` changed
+- Reinstall and reload the systemd unit when `inky-image.service` changed
+- Restart `inky-image.service`
+
+If you installed to a custom directory or user, pass the same values used during
+installation. Run the updater from the git checkout; it will sync files to the
+target directory when `--target-dir` points somewhere else:
+
+```bash
+sudo ./update.sh --user pi --target-dir /home/pi/inky-image
+```
+
 ## Usage
 
 ### Web UI

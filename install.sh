@@ -68,7 +68,7 @@ SERVICE_TEMPLATE="${SOURCE_DIR}/inky-image.service"
 SERVICE_PATH="/etc/systemd/system/inky-image.service"
 
 echo "[1/8] Validating project structure..."
-for requiredPath in "inky_image" "templates" "static" "requirements.txt" "inky-image.service"; do
+for requiredPath in "inky_image" "templates" "static" "requirements.txt" "inky-image.service" "update.sh"; do
 	if [[ ! -e "${SOURCE_DIR}/${requiredPath}" ]]; then
 		echo "Missing required path: ${SOURCE_DIR}/${requiredPath}" >&2
 		echo "Run install.sh from a complete project checkout." >&2
