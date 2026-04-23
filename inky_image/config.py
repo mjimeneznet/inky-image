@@ -29,6 +29,22 @@ DEFAULT_CONFIG = {
 }
 
 
+def _safe_int(value: Any, default: int) -> int:
+    """Return an int value, or a default when persisted config is invalid."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_float(value: Any, default: float) -> float:
+    """Return a float value, or a default when persisted config is invalid."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 class ConfigManager:
     """Thread-safe JSON config manager."""
 
@@ -80,8 +96,8 @@ class ConfigManager:
                 for path in self._data.get("uploaded_images", [])
                 if isinstance(path, str)
             ]
-            self._data["active_directory_index"] = int(
-                self._data.get("active_directory_index", -1)
+            self._data["active_directory_index"] = _safe_int(
+                self._data.get("active_directory_index", -1), -1
             )
             mode = str(self._data.get("slideshow_mode", "directory")).strip().lower()
             self._data["slideshow_mode"] = (
@@ -89,17 +105,19 @@ class ConfigManager:
                 if mode in {"directory", "image_list", "url", "upload"}
                 else "directory"
             )
-            self._data["current_image_index"] = int(
-                self._data.get("current_image_index", 0)
+            self._data["current_image_index"] = _safe_int(
+                self._data.get("current_image_index", 0), 0
             )
             last_rendered = self._data.get("last_rendered_image_path", "")
             self._data["last_rendered_image_path"] = (
                 str(last_rendered) if last_rendered is not None else ""
             )
             self._data["slideshow_interval"] = max(
-                30, int(self._data.get("slideshow_interval", 30))
+                30, _safe_int(self._data.get("slideshow_interval", 30), 30)
             )
-            self._data["saturation"] = float(self._data.get("saturation", 0.5))
+            self._data["saturation"] = _safe_float(
+                self._data.get("saturation", 0.5), 0.5
+            )
             self._data["saturation"] = max(0.0, min(1.0, self._data["saturation"]))
             scale_raw = self._data.get("scale_to_fit", True)
             if isinstance(scale_raw, str):
@@ -122,13 +140,13 @@ class ConfigManager:
             else:
                 self._data["lock_buttons"] = bool(lock_buttons_raw)
             self._data["render_width"] = max(
-                64, int(self._data.get("render_width", 800))
+                64, _safe_int(self._data.get("render_width", 800), 800)
             )
             self._data["render_height"] = max(
-                64, int(self._data.get("render_height", 480))
+                64, _safe_int(self._data.get("render_height", 480), 480)
             )
             web_port_raw = self._data.get("web_port", 80)
-            self._data["web_port"] = int(web_port_raw)
+            self._data["web_port"] = _safe_int(web_port_raw, 80)
             if self._data["web_port"] == 8080:
                 self._data["web_port"] = 80
             self._sync_indexes()
@@ -343,7 +361,7 @@ class ConfigManager:
     def _sync_indexes(self) -> None:
         """Normalize indexes against current list lengths."""
         directories = self._data.get("directories", [])
-        active_index = int(self._data.get("active_directory_index", -1))
+        active_index = _safe_int(self._data.get("active_directory_index", -1), -1)
         if not directories:
             active_index = -1
         else:
@@ -354,7 +372,7 @@ class ConfigManager:
         self._data["active_directory_index"] = active_index
 
         mode = str(self._data.get("slideshow_mode", "directory")).strip().lower()
-        current_index = int(self._data.get("current_image_index", 0))
+        current_index = _safe_int(self._data.get("current_image_index", 0), 0)
         if mode == "image_list":
             selected_images = self._data.get("selected_images", [])
             if not isinstance(selected_images, list) or not selected_images:
