@@ -14,6 +14,32 @@ from inky_image.image_manager import ImageManager, SUPPORTED_EXTENSIONS
 from inky_image.slideshow import SlideshowController
 
 
+def _browse_roots_from_env() -> list[Path]:
+    """Resolve filesystem roots allowed for browser and preview endpoints."""
+    raw_roots = os.environ.get("INKY_IMAGE_BROWSE_ROOTS", "")
+    raw_roots = raw_roots.replace(",", os.pathsep)
+    root_values = [
+        value.strip() for value in raw_roots.split(os.pathsep) if value.strip()
+    ]
+    if not root_values:
+        root_values = [str(Path.home()), "/mnt", "/media"]
+
+    roots: list[Path] = []
+    for value in root_values:
+        try:
+            root = Path(value).expanduser().resolve()
+        except OSError:
+            continue
+        if (not root.exists() or root.is_dir()) and root not in roots:
+            roots.append(root)
+    return roots
+
+
+def _path_is_under_roots(path: Path, roots: list[Path]) -> bool:
+    """Return true when path is inside one of the allowed browse roots."""
+    return any(path == root or root in path.parents for root in roots)
+
+
 def create_web_app(
     config: ConfigManager,
     image_manager: ImageManager,
@@ -28,6 +54,8 @@ def create_web_app(
     placeholder_path = (
         Path(__file__).resolve().parent.parent / "static" / "no-image.jpg"
     )
+    browse_roots = _browse_roots_from_env()
+    default_browse_root = browse_roots[0] if browse_roots else Path.home().resolve()
 
     app = Flask(
         __name__,
@@ -71,7 +99,10 @@ def create_web_app(
         if raw_path:
             path_obj = Path(raw_path).expanduser().resolve()
         else:
-            path_obj = Path.home().resolve()
+            path_obj = default_browse_root
+
+        if not _path_is_under_roots(path_obj, browse_roots):
+            return jsonify({"ok": False, "error": "Path is outside allowed roots"}), 403
 
         if not path_obj.exists() or not path_obj.is_dir():
             return jsonify({"ok": False, "error": "Invalid directory path"}), 400
@@ -82,6 +113,8 @@ def create_web_app(
                 try:
                     resolved = child.resolve()
                 except OSError:
+                    continue
+                if not _path_is_under_roots(resolved, browse_roots):
                     continue
                 if child.is_dir():
                     entries.append(
@@ -107,7 +140,10 @@ def create_web_app(
             key=lambda value: (value["type"] != "directory", value["name"].lower())
         )
         parent_path = (
-            str(path_obj.parent.resolve()) if path_obj.parent != path_obj else None
+            str(path_obj.parent.resolve())
+            if path_obj.parent != path_obj
+            and _path_is_under_roots(path_obj.parent.resolve(), browse_roots)
+            else None
         )
 
         return jsonify(
@@ -142,12 +178,15 @@ def create_web_app(
         except (ValueError, TypeError):
             pass
 
-        directories = [{"path": "/", "label": "/"}]
+        directories = [
+            {"path": str(root), "label": f"{root}/" if str(root) == "/" else str(root)}
+            for root in browse_roots
+        ]
         truncated = False
         timeout_hit = False
         deadline = time.monotonic() + (timeout_ms / 1000.0)
 
-        queue = deque([("/", 0)])
+        queue = deque((str(root), 0) for root in browse_roots)
         while queue:
             if time.monotonic() >= deadline:
                 timeout_hit = True
@@ -172,7 +211,13 @@ def create_web_app(
                 continue
 
             for child in children:
-                path = child.path
+                try:
+                    child_path = Path(child.path).resolve()
+                except OSError:
+                    continue
+                if not _path_is_under_roots(child_path, browse_roots):
+                    continue
+                path = str(child_path)
                 child_depth = depth + 1
                 indent = "  " * max(0, child_depth - 1)
                 label = f"{indent}{child.name}/"
@@ -522,6 +567,8 @@ def create_web_app(
         if not raw_path:
             return jsonify({"ok": False, "error": "Missing path"}), 400
         path_obj = Path(raw_path).expanduser().resolve()
+        if not _path_is_under_roots(path_obj, browse_roots):
+            return jsonify({"ok": False, "error": "Path is outside allowed roots"}), 403
         if not path_obj.exists() or not path_obj.is_file():
             return jsonify({"ok": False, "error": "Invalid file path"}), 404
         if path_obj.suffix.lower() not in SUPPORTED_EXTENSIONS:

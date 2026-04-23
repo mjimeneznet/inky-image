@@ -98,6 +98,17 @@ Stored values include:
 - `render_height`
 - `web_port`
 
+The web UI file browser and local image preview endpoints are limited to allowed
+filesystem roots. By default, the service allows browsing the target user's home
+directory, `/mnt`, and `/media`.
+
+Set `INKY_IMAGE_BROWSE_ROOTS` to override those roots. Separate entries with
+colons or commas:
+
+```bash
+INKY_IMAGE_BROWSE_ROOTS=/mnt/photos:/media/nfs
+```
+
 ## Service Management
 
 ```bash
@@ -113,4 +124,3 @@ sudo journalctl -u inky-image.service -f
 - If the service fails, check logs with:
   `sudo journalctl -u inky-image.service --no-pager`.
 - Ensure configured directories exist and contain supported image files.
-
