@@ -151,6 +151,7 @@ def create_web_app(
                 "ok": True,
                 "path": str(path_obj),
                 "parent_path": parent_path,
+                "root_paths": [str(root) for root in browse_roots],
                 "entries": entries,
                 "is_root": path_obj.parent == path_obj,
             }

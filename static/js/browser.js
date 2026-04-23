@@ -84,6 +84,17 @@ export function createBrowser({ state, api, getActiveMode, previews, showMessage
 					path: state.browserState.parentPath,
 					label: ".. (parent directory)",
 				});
+			} else {
+				for (const rootPath of result.root_paths || []) {
+					if (rootPath === result.path) {
+						continue;
+					}
+					entries.push({
+						type: "directory",
+						path: rootPath,
+						label: `.. ${rootPath}`,
+					});
+				}
 			}
 			for (const entry of result.entries || []) {
 				entries.push({
