@@ -105,6 +105,24 @@ function renderListItems(list, items) {
 			actions.appendChild(previewBtn);
 		}
 
+		if (item.onMoveUp) {
+			const upBtn = document.createElement("button");
+			upBtn.className = "icon-btn";
+			upBtn.title = "Move up";
+			upBtn.innerHTML = "<i data-lucide='arrow-up'></i>";
+			upBtn.onclick = item.onMoveUp;
+			actions.appendChild(upBtn);
+		}
+
+		if (item.onMoveDown) {
+			const downBtn = document.createElement("button");
+			downBtn.className = "icon-btn";
+			downBtn.title = "Move down";
+			downBtn.innerHTML = "<i data-lucide='arrow-down'></i>";
+			downBtn.onclick = item.onMoveDown;
+			actions.appendChild(downBtn);
+		}
+
 		const removeBtn = document.createElement("button");
 		removeBtn.className = "icon-btn";
 		removeBtn.title = "Remove";
@@ -183,6 +201,24 @@ function renderSelectedImages(status) {
 						await refreshStatus();
 					},
 					{ startMessage: "Deactivating selected image and showing no-image..." }
+				);
+			},
+			onMoveUp: async () => {
+				await runUiAction(
+					async () => {
+						await api(`/api/images/${index}/move-up`, { method: "POST" });
+						await refreshStatus();
+					},
+					{ startMessage: "Moving image up..." }
+				);
+			},
+			onMoveDown: async () => {
+				await runUiAction(
+					async () => {
+						await api(`/api/images/${index}/move-down`, { method: "POST" });
+						await refreshStatus();
+					},
+					{ startMessage: "Moving image down..." }
 				);
 			},
 			onRemove: async () => {
