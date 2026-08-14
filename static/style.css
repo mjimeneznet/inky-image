@@ -488,7 +488,7 @@ button:disabled {
 	grid-template-columns: repeat(2, minmax(130px, 1fr));
 }
 
-.controls button:not(.icon-btn) {
+.controls button {
 	width: 100%;
 }
 
