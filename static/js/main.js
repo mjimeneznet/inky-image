@@ -408,7 +408,7 @@ async function refreshStatus() {
 		if (status.last_action && status.last_action.ts !== state.lastActionTs) {
 			state.lastActionTs = status.last_action.ts;
 			const labels = { A: "Slideshow toggled", B: "Next image", C: "Previous image", D: "Mode cycled" };
-			feedback.showMessage(labels[status.last_action.action] || "Button " + status.last_action.action);
+			feedback.showToast(labels[status.last_action.action] || "Button " + status.last_action.action, "info", 3000);
 		}
 		feedback.updateTopStatus(status);
 		applyModeUiState(status);
