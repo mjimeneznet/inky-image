@@ -87,36 +87,35 @@ function renderListItems(list, items) {
 		li.appendChild(name);
 
 		const actions = document.createElement("div");
-		actions.className = "row";
+		actions.className = "actions-group";
 
-		const activate = document.createElement("button");
-		activate.textContent = item.isActive ? "Deactivate" : "Activate";
-		activate.onclick = item.isActive ? item.onDeactivate : item.onActivate;
-		actions.appendChild(activate);
+		const toggleBtn = document.createElement("button");
+		toggleBtn.className = "icon-btn";
+		toggleBtn.title = item.isActive ? "Deactivate" : "Activate";
+		toggleBtn.innerHTML = "<i data-lucide='" + (item.isActive ? "power-off" : "power") + "'></i>";
+		toggleBtn.onclick = item.isActive ? item.onDeactivate : item.onActivate;
+		actions.appendChild(toggleBtn);
 
-		const menu = document.createElement("details");
-		menu.className = "row-actions-menu";
-		const menuSummary = document.createElement("summary");
-		menuSummary.textContent = "More";
-		const menuBody = document.createElement("div");
-		menuBody.className = "row actions-popover";
 		if (item.onPreview) {
-			const preview = document.createElement("button");
-			preview.textContent = "Preview";
-			preview.onclick = item.onPreview;
-			menuBody.appendChild(preview);
+			const previewBtn = document.createElement("button");
+			previewBtn.className = "icon-btn";
+			previewBtn.title = "Preview";
+			previewBtn.innerHTML = "<i data-lucide='eye'></i>";
+			previewBtn.onclick = item.onPreview;
+			actions.appendChild(previewBtn);
 		}
-		const remove = document.createElement("button");
-		remove.textContent = "Remove";
-		remove.onclick = item.onRemove;
-		menuBody.appendChild(remove);
-		menu.appendChild(menuSummary);
-		menu.appendChild(menuBody);
-		actions.appendChild(menu);
+
+		const removeBtn = document.createElement("button");
+		removeBtn.className = "icon-btn";
+		removeBtn.title = "Remove";
+		removeBtn.innerHTML = "<i data-lucide='trash'></i>";
+		removeBtn.onclick = item.onRemove;
+		actions.appendChild(removeBtn);
 
 		li.appendChild(actions);
 		list.appendChild(li);
 	});
+	lucide.createIcons();
 }
 
 function renderDirectories(status) {
@@ -341,6 +340,7 @@ function applyModeUiState(status) {
 	}
 	browser.renderFilteredEntries();
 	browser.updateAddButtonState();
+	lucide.createIcons();
 }
 
 async function refreshStatus() {
