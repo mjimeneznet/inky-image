@@ -417,7 +417,12 @@ async function refreshStatus() {
 		} else {
 			console.log("[toast-debug] SKIPPING toast. Reason:", status.last_action ? "same ts" : "no last_action");
 		}
-		feedback.updateTopStatus(status);
+		if (status.render_in_progress) {
+			feedback.showBusyBadge("Display is refreshing...");
+		} else {
+			feedback.hideBusyBadge();
+		}
+		feedback.updateTopStatus(status);	feedback.updateTopStatus(status);
 		applyModeUiState(status);
 		previews.refreshPreviewImage();
 		if (status.scan_error) {

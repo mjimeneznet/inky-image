@@ -30,3 +30,7 @@ class Renderer(ABC):
     def pop_last_action(self) -> dict[str, str] | None:
         """Atomically read and clear the last button action."""
         return None
+
+    def is_render_in_progress(self) -> bool:
+        """Return True when a display refresh is in progress."""
+        return False

@@ -43,6 +43,7 @@ class Application(Renderer):
 		self._last_render_signature: tuple[str, float, bool, int, int] | None = None
 		self._last_action: dict[str, str] | None = None
 		self._action_lock = threading.RLock()
+		self._render_in_progress = False
 
 		self.slideshow = SlideshowController(
 			interval_seconds_getter=lambda: int(self.config.get("slideshow_interval", 30)),
@@ -79,7 +80,11 @@ class Application(Renderer):
 		if not self.no_image_path.exists():
 			logger.warning("No directories configured and placeholder missing: %s", self.no_image_path)
 			return False
-		return self._render_image_path_locked(str(self.no_image_path), "no-image placeholder")
+		self._render_in_progress = True
+		try:
+			return self._render_image_path_locked(str(self.no_image_path), "no-image placeholder")
+		finally:
+			self._render_in_progress = False
 
 	def render_next_image(self) -> bool:
 		"""Advance image index and render."""
@@ -139,12 +144,14 @@ class Application(Renderer):
 
 	def _render_image_path_locked(self, image_path: str, label: str, force: bool = False) -> bool:
 		"""Render image while render lock is held."""
+		self._render_in_progress = True
 		saturation = float(self.config.get("saturation", 0.5))
 		scale_to_fit = bool(self.config.get("scale_to_fit", True))
 		render_width = int(self.config.get("render_width", 800))
 		render_height = int(self.config.get("render_height", 480))
 		signature = (image_path, saturation, scale_to_fit, render_width, render_height)
 		if not force and self._last_render_signature == signature:
+			self._render_in_progress = False
 			logger.info("Skipping render for %s (same image and settings)", label)
 			return True
 
@@ -163,6 +170,8 @@ class Application(Renderer):
 		except Exception as exc:  # pragma: no cover - hardware path
 			logger.exception("Failed to display %s %s: %s", label, image_path, exc)
 			return False
+		finally:
+			self._render_in_progress = False
 
 	def _setup_buttons(self) -> None:
 		callbacks = {
@@ -231,6 +240,10 @@ class Application(Renderer):
 		if self._button_handler:
 			self._button_handler.stop()
 		logger.info("Inky Image Viewer stopped")
+
+	def is_render_in_progress(self) -> bool:
+		"""Return True when a display refresh is in progress."""
+		return self._render_in_progress
 
 	def get_last_rendered_image_path(self) -> str | None:
 		"""Return image path last rendered to the physical e-ink display."""
