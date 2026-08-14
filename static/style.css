@@ -291,6 +291,19 @@ h2 {
 	background: #223550;
 }
 
+#add-directory-button {
+	font-weight: 600;
+	padding: 10px;
+	background: #172133;
+	border: 1px solid #3a4861;
+	color: #deebff;
+	cursor: pointer;
+}
+
+#add-directory-button:hover {
+	background: #202d43;
+}
+
 .icon-btn {
 	width: 32px;
 	height: 32px;
@@ -475,7 +488,7 @@ button:disabled {
 	grid-template-columns: repeat(2, minmax(130px, 1fr));
 }
 
-.controls button {
+.controls button:not(.icon-btn) {
 	width: 100%;
 }
 
