@@ -23,38 +23,31 @@ const browser = createBrowser({
 	api,
 	getActiveMode: () => getActiveMode(state),
 	previews,
-	showMessage: feedback.showMessage,
+	showToast: feedback.showToast,
 });
 
 const palette = createCommandPalette();
 
 async function runUiAction(actionFn, options = {}) {
 	if (state.uiActionInProgress) {
-		feedback.showMessage("Display is refreshing. Wait until current action finishes.");
-		feedback.showBadge("Display busy: action ignored", "warning");
+		feedback.showToast("Display busy: action ignored", "warning");
 		return null;
 	}
 	const startMessage = options.startMessage || "Display is refreshing...";
 	state.uiActionInProgress = true;
 	feedback.setUiButtonsDisabled(true);
-	feedback.setTopUiState("busy");
-	feedback.showMessage(startMessage);
 	feedback.setActionStatus(startMessage, true);
-	feedback.showBusyBadge(startMessage);
 	try {
 		return await actionFn();
 	} catch (error) {
-		feedback.showMessage(error.message);
-		feedback.showBadge(error.message, "warning");
+		feedback.showToast(error.message, "warning");
 		return null;
 	} finally {
 		state.uiActionInProgress = false;
 		feedback.setUiButtonsDisabled(false);
-		feedback.setTopUiState("ready");
 		feedback.setActionStatus("Ready", false);
 		applyModeUiState(state.latestStatus || {});
 		browser.updateAddButtonState();
-		feedback.hideBusyBadge();
 	}
 }
 
@@ -66,7 +59,7 @@ async function activateMode(mode) {
 				method: "POST",
 				body: JSON.stringify({ mode: normalized }),
 			});
-			feedback.showBadge(`Mode activated: ${formatModeLabel(normalized)}`, "success");
+			feedback.showToast(`Mode activated: ${formatModeLabel(normalized)}`, "success");
 			await refreshStatus();
 		},
 		{ startMessage: `Activating ${formatModeLabel(normalized)} mode and refreshing display...` }
@@ -363,7 +356,6 @@ async function refreshStatus() {
 			setModeButtons(status.mode || "directory", state);
 			state.uiModeInitialized = true;
 		}
-		document.getElementById("status-output").textContent = JSON.stringify(status, null, 2);
 		document.getElementById("toggle-button").textContent = status.slideshow_running
 			? "Stop slideshow (A)"
 			: "Start slideshow (A)";
@@ -371,10 +363,10 @@ async function refreshStatus() {
 		applyModeUiState(status);
 		previews.refreshPreviewImage();
 		if (status.scan_error) {
-			feedback.showMessage(status.scan_error);
+			feedback.showToast(status.scan_error, "warning");
 		}
 	} catch (error) {
-		feedback.showMessage(error.message);
+		feedback.showToast(error.message, "warning");
 	}
 }
 
@@ -387,29 +379,29 @@ function bindEvents() {
 			if (mode === "directory") {
 				const folderPath = String(state.browserState.currentPath || "").trim();
 				if (!folderPath) {
-					feedback.showMessage("No current folder selected.");
+					feedback.showToast("No current folder selected.", "warning");
 					return;
 				}
 				await api("/api/directories", {
 					method: "POST",
 					body: JSON.stringify({ path: folderPath }),
 				});
-				feedback.showMessage("Directory added successfully.");
-				feedback.showBadge("Directory added", "success");
+				feedback.showToast("Directory added", "success");
+				
 				await refreshStatus();
 				return;
 			}
 			const entry = state.browserState.selectedEntry;
 			if (!entry || entry.type !== "image") {
-				feedback.showMessage("Select an image entry first.");
+				feedback.showToast("Select an image entry first.", "warning");
 				return;
 			}
 			await api("/api/images", {
 				method: "POST",
 				body: JSON.stringify({ path: entry.path }),
 			});
-			feedback.showMessage("Image added successfully.");
-			feedback.showBadge("Image added", "success");
+			feedback.showToast("Image added", "success");
+			
 			await refreshStatus();
 		}, { startMessage: "Adding selected entry..." });
 	};
@@ -418,15 +410,15 @@ function bindEvents() {
 		await runUiAction(async () => {
 			const rawUrl = String(document.getElementById("url-image-input").value || "").trim();
 			if (!rawUrl) {
-				feedback.showMessage("Enter an image URL first.");
+				feedback.showToast("Enter an image URL first.", "warning");
 				return;
 			}
 			await api("/api/url-images", {
 				method: "POST",
 				body: JSON.stringify({ url: rawUrl }),
 			});
-			feedback.showMessage("URL image added successfully.");
-			feedback.showBadge("URL image added", "success");
+			feedback.showToast("URL image added", "success");
+			
 			await refreshStatus();
 		}, { startMessage: "Adding URL image..." });
 	};
@@ -436,7 +428,7 @@ function bindEvents() {
 			await api("/api/url-images/clear", { method: "POST" });
 			state.urlPreviewPath = "";
 			previews.refreshUrlPreviewImage();
-			feedback.showBadge("URL image list cleared", "success");
+			feedback.showToast("URL image list cleared", "success");
 			await refreshStatus();
 		}, { startMessage: "Clearing URL image list..." });
 	};
@@ -446,7 +438,7 @@ function bindEvents() {
 			const input = document.getElementById("upload-image-input");
 			const file = input.files && input.files[0];
 			if (!file) {
-				feedback.showMessage("Select an image file first.");
+				feedback.showToast("Select an image file first.", "warning");
 				return;
 			}
 			const formData = new FormData();
@@ -460,7 +452,7 @@ function bindEvents() {
 				throw new Error(error.error || "Upload failed");
 			}
 			input.value = "";
-			feedback.showBadge("Uploaded image added", "success");
+			feedback.showToast("Uploaded image added", "success");
 			await refreshStatus();
 		}, { startMessage: "Uploading image..." });
 	};
@@ -469,7 +461,7 @@ function bindEvents() {
 		await runUiAction(async () => {
 			await api("/api/upload-images/clear", { method: "POST" });
 			document.getElementById("upload-image-input").value = "";
-			feedback.showBadge("Uploaded image list cleared", "success");
+			feedback.showToast("Uploaded image list cleared", "success");
 			await refreshStatus();
 		}, { startMessage: "Clearing uploaded images..." });
 	};
@@ -525,7 +517,7 @@ function bindEvents() {
 			await api("/api/images/clear", { method: "POST" });
 			state.selectedPreviewPath = null;
 			previews.refreshSelectedPreviewImage();
-			feedback.showBadge("Image list cleared", "success");
+			feedback.showToast("Image list cleared", "success");
 			await refreshStatus();
 		}, { startMessage: "Clearing selected image list..." });
 	};
@@ -640,8 +632,7 @@ function bindEvents() {
 			state.selectedPreviewPath = null;
 			previews.refreshSelectedPreviewImage();
 			applyModeUiState(state.latestStatus || {});
-			feedback.showMessage(`UI mode selected: ${formatModeLabel(mode)}.`);
-			feedback.showBadge(`Mode selected: ${formatModeLabel(mode)}`, "info");
+			feedback.showToast(`Mode selected: ${formatModeLabel(mode)}`, "info");
 		};
 	});
 
@@ -663,8 +654,7 @@ function bindEvents() {
 		await runUiAction(async () => {
 			const result = await api("/api/slideshow/next", { method: "POST" });
 			if (result.ok === false) {
-				feedback.showMessage("Display is busy, next action ignored.");
-				feedback.showBadge("Display busy: next ignored", "warning");
+				feedback.showToast("Display busy: next ignored", "warning");
 			}
 			await refreshStatus();
 		}, { startMessage: "Loading next image on display..." });
@@ -674,8 +664,7 @@ function bindEvents() {
 		await runUiAction(async () => {
 			const result = await api("/api/slideshow/prev", { method: "POST" });
 			if (result.ok === false) {
-				feedback.showMessage("Display is busy, previous action ignored.");
-				feedback.showBadge("Display busy: previous ignored", "warning");
+				feedback.showToast("Display busy: previous ignored", "warning");
 			}
 			await refreshStatus();
 		}, { startMessage: "Loading previous image on display..." });
@@ -685,13 +674,11 @@ function bindEvents() {
 		await runUiAction(async () => {
 			const result = await api("/api/folder/cycle", { method: "POST" });
 			if (result.ok === false) {
-				feedback.showMessage("Display is busy, mode change ignored.");
-				feedback.showBadge("Display busy: mode change ignored", "warning");
+				feedback.showToast("Display busy: mode change ignored", "warning");
 			} else {
 				const mode = String(result.mode || "");
 				if (mode) {
-					feedback.showMessage(`Mode changed to ${mode}.`);
-					feedback.showBadge(`Mode changed: ${mode}`, "success");
+					feedback.showToast(`Mode changed: ${mode}`, "success");
 				}
 			}
 			await refreshStatus();
@@ -702,11 +689,9 @@ function bindEvents() {
 		await runUiAction(async () => {
 			const result = await api("/api/slideshow/reshuffle", { method: "POST" });
 			if (result.ok === false) {
-				feedback.showMessage("Display is busy, reshuffle ignored.");
-				feedback.showBadge("Display busy: reshuffle ignored", "warning");
+				feedback.showToast("Display busy: reshuffle ignored", "warning");
 			} else {
-				feedback.showMessage("Slideshow order reshuffled.");
-				feedback.showBadge("Slideshow reshuffled", "success");
+				feedback.showToast("Slideshow reshuffled", "success");
 			}
 			await refreshStatus();
 		}, { startMessage: "Reshuffling slideshow and refreshing display..." });
@@ -731,7 +716,7 @@ function bindEvents() {
 					render_height: renderHeight,
 				}),
 			});
-			feedback.showBadge("Settings saved", "success");
+			feedback.showToast("Settings saved", "success");
 			await refreshStatus();
 		}, { startMessage: "Saving settings..." });
 	};
@@ -836,7 +821,6 @@ function buildCommandPaletteCommands() {
 		state.selectedPreviewPath = null;
 		previews.refreshSelectedPreviewImage();
 		applyModeUiState(state.latestStatus || {});
-		feedback.showMessage(`UI mode selected: ${formatModeLabel(mode)}.`);
 		feedback.showToast(`Mode selected: ${formatModeLabel(mode)}`, "info");
 	};
 
