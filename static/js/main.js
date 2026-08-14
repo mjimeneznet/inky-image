@@ -405,6 +405,11 @@ async function refreshStatus() {
 			toggleBtn.innerHTML = "<i data-lucide='" + (isRunning ? "pause" : "play") + "'></i>";
 		}
 		lucide.createIcons();
+		if (status.last_action && status.last_action.ts !== state.lastActionTs) {
+			state.lastActionTs = status.last_action.ts;
+			const labels = { A: "Slideshow toggled", B: "Next image", C: "Previous image", D: "Mode cycled" };
+			feedback.showMessage(labels[status.last_action.action] || "Button " + status.last_action.action);
+		}
 		feedback.updateTopStatus(status);
 		applyModeUiState(status);
 		previews.refreshPreviewImage();

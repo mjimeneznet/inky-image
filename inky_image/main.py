@@ -41,6 +41,7 @@ class Application(Renderer):
 		self._web_server_failed = False
 		self.no_image_path = Path(__file__).resolve().parent.parent / "static" / "no-image.jpg"
 		self._last_render_signature: tuple[str, float, bool, int, int] | None = None
+		self._last_action: dict[str, str] | None = None
 
 		self.slideshow = SlideshowController(
 			interval_seconds_getter=lambda: int(self.config.get("slideshow_interval", 30)),
@@ -178,6 +179,7 @@ class Application(Renderer):
 			logger.info("Ignoring button %s: physical buttons are locked", label)
 			return
 		action()
+		self._last_action = {"action": label, "ts": str(time.monotonic())}
 
 	def _toggle_slideshow_from_button(self) -> None:
 		is_running = self.slideshow.toggle()
@@ -233,6 +235,10 @@ class Application(Renderer):
 		if not isinstance(path, str) or not path.strip():
 			return None
 		return path
+
+	def get_last_action(self) -> dict[str, str] | None:
+		"""Return the last physical button action, or None."""
+		return self._last_action
 
 
 def main() -> None:

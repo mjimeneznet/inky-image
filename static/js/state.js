@@ -22,5 +22,6 @@ export function createState() {
 		listPreviewType: "",
 		listPreviewValue: "",
 		listPreviewRenderToken: "",
+		lastActionTs: null,
 	};
 }
