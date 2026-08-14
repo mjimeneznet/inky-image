@@ -48,11 +48,14 @@ async function runUiAction(actionFn, options = {}) {
 		return null;
 	} finally {
 		state.uiActionInProgress = false;
-		feedback.setUiButtonsDisabled(false);
+		const stillRendering = state.latestStatus && state.latestStatus.render_in_progress;
+		if (!stillRendering) {
+			feedback.setUiButtonsDisabled(false);
+			feedback.hideBusyBadge();
+		}
 		feedback.setTopUiState("ready");
 		applyModeUiState(state.latestStatus || {});
 		browser.updateAddButtonState();
-		feedback.hideBusyBadge();
 	}
 }
 
@@ -419,10 +422,16 @@ async function refreshStatus() {
 		}
 		if (status.render_in_progress) {
 			feedback.showBusyBadge("Display is refreshing...");
+			if (!state.uiActionInProgress) {
+				feedback.setUiButtonsDisabled(true);
+			}
 		} else {
 			feedback.hideBusyBadge();
+			if (!state.uiActionInProgress) {
+				feedback.setUiButtonsDisabled(false);
+			}
 		}
-		feedback.updateTopStatus(status);	feedback.updateTopStatus(status);
+		feedback.updateTopStatus(status);
 		applyModeUiState(status);
 		previews.refreshPreviewImage();
 		if (status.scan_error) {
