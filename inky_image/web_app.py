@@ -116,6 +116,16 @@ def create_web_app(
             status["last_action"] = last_action
         return jsonify(status)
 
+    @app.post("/api/debug-toast")
+    def debug_toast():
+        """Test endpoint: set _last_action to trigger a toast for debugging."""
+        payload = request.get_json(silent=True) or {}
+        action = str(payload.get("action", "B")).strip().upper()
+        if action not in {"A", "B", "C", "D"}:
+            action = "B"
+        setattr(renderer, "_last_action", {"action": action, "ts": str(time.monotonic())})
+        return jsonify({"ok": True, "message": f"Toast test: _last_action set to {action}"})
+
     @app.post("/api/directories")
     def add_directory():
         payload = request.get_json(silent=True) or {}
