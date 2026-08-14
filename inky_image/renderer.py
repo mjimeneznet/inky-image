@@ -22,3 +22,6 @@ class Renderer(ABC):
 
     @abstractmethod
     def get_last_rendered_image_path(self) -> str | None: ...
+
+    def get_last_action(self) -> dict[str, str] | None:
+        return None
