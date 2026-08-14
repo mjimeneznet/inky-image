@@ -13,9 +13,7 @@ export function createFeedback({ formatModeLabel, contrastStorageKey }) {
 		toast.className = `toast ${type}`;
 		toast.textContent = String(message || "");
 		container.appendChild(toast);
-		requestAnimationFrame(() => {
-			toast.classList.add("visible");
-		});
+		toast.classList.add("visible");
 		window.setTimeout(() => {
 			toast.classList.remove("visible");
 			window.setTimeout(() => {
