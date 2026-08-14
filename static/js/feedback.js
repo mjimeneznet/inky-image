@@ -4,6 +4,7 @@ export function createFeedback({ formatModeLabel, contrastStorageKey }) {
 	}
 
 	function showToast(message, type = "info", timeoutMs = 2500) {
+		console.log("[toast-debug] showToast called:", { message, type, timeoutMs });
 		const container = document.getElementById("toast-container");
 		if (!container) {
 			return;
