@@ -24,4 +24,9 @@ class Renderer(ABC):
     def get_last_rendered_image_path(self) -> str | None: ...
 
     def get_last_action(self) -> dict[str, str] | None:
+        """Return the last physical button action without clearing it."""
+        return None
+
+    def pop_last_action(self) -> dict[str, str] | None:
+        """Atomically read and clear the last button action."""
         return None

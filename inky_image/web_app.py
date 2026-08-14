@@ -111,7 +111,7 @@ def create_web_app(
         status["render_width"] = int(config.get("render_width", 800))
         status["render_height"] = int(config.get("render_height", 480))
         status["web_port"] = int(config.get("web_port", 80))
-        last_action = renderer.get_last_action()
+        last_action = renderer.pop_last_action()
         if last_action:
             status["last_action"] = last_action
         return jsonify(status)

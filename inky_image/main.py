@@ -42,6 +42,7 @@ class Application(Renderer):
 		self.no_image_path = Path(__file__).resolve().parent.parent / "static" / "no-image.jpg"
 		self._last_render_signature: tuple[str, float, bool, int, int] | None = None
 		self._last_action: dict[str, str] | None = None
+		self._action_lock = threading.RLock()
 
 		self.slideshow = SlideshowController(
 			interval_seconds_getter=lambda: int(self.config.get("slideshow_interval", 30)),
@@ -178,8 +179,9 @@ class Application(Renderer):
 		if bool(self.config.get("lock_buttons", False)):
 			logger.info("Ignoring button %s: physical buttons are locked", label)
 			return
+		with self._action_lock:
+			self._last_action = {"action": label, "ts": str(time.monotonic())}
 		action()
-		self._last_action = {"action": label, "ts": str(time.monotonic())}
 
 	def _toggle_slideshow_from_button(self) -> None:
 		is_running = self.slideshow.toggle()
@@ -237,8 +239,16 @@ class Application(Renderer):
 		return path
 
 	def get_last_action(self) -> dict[str, str] | None:
-		"""Return the last physical button action, or None."""
-		return self._last_action
+		"""Return the last physical button action without clearing it."""
+		with self._action_lock:
+			return self._last_action
+
+	def pop_last_action(self) -> dict[str, str] | None:
+		"""Atomically read and clear the last button action."""
+		with self._action_lock:
+			result = self._last_action
+			self._last_action = None
+			return result
 
 
 def main() -> None:
