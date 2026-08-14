@@ -400,9 +400,13 @@ async function refreshStatus() {
 			state.uiModeInitialized = true;
 		}
 		document.getElementById("status-output").textContent = JSON.stringify(status, null, 2);
-		document.getElementById("toggle-button").textContent = status.slideshow_running
-			? "Stop slideshow (A)"
-			: "Start slideshow (A)";
+		const toggleBtn = document.getElementById("toggle-button");
+		if (toggleBtn) {
+			const isRunning = Boolean(status.slideshow_running);
+			toggleBtn.title = isRunning ? "Stop slideshow (A)" : "Start slideshow (A)";
+			toggleBtn.innerHTML = "<i data-lucide='" + (isRunning ? "pause" : "play") + "'></i>";
+		}
+		lucide.createIcons();
 		feedback.updateTopStatus(status);
 		applyModeUiState(status);
 		previews.refreshPreviewImage();

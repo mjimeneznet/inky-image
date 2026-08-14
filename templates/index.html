@@ -65,7 +65,7 @@
 						<code id="current-path-display">/</code>
 					</div>
 					<select id="browser-directories-select" size="14"></select>
-					<button id="add-directory-button">Add current folder</button>
+					<button id="add-directory-button" class="icon-btn" title="Add current folder"><i data-lucide="folder-plus"></i></button>
 				</div>
 				<div id="selection-preview-wrapper" class="preview-secondary" hidden>
 					<img id="selected-image-preview" alt="Selected image preview" />
@@ -80,7 +80,7 @@
 			<div id="selected-images-section" hidden>
 				<h2>Selected images</h2>
 				<div class="row">
-					<button id="clear-images-button">Clear image list</button>
+					<button id="clear-images-button" class="icon-btn" title="Clear image list"><i data-lucide="trash-2"></i></button>
 				</div>
 				<ul id="selected-images-list"></ul>
 			</div>
@@ -91,8 +91,8 @@
 				<input id="url-image-input" type="url" placeholder="https://example.com/image.jpg">
 				<p id="url-validation-message" class="url-validation neutral">Enter a valid http/https image URL.</p>
 				<div class="row url-actions-row">
-					<button id="add-url-image-button">Add URL image</button>
-					<button id="clear-url-images-button">Clear URL list</button>
+					<button id="add-url-image-button" class="icon-btn" title="Add URL image"><i data-lucide="link-plus"></i></button>
+					<button id="clear-url-images-button" class="icon-btn" title="Clear URL list"><i data-lucide="trash-2"></i></button>
 				</div>
 				<div id="url-preview-wrapper" class="preview-secondary" hidden>
 					<img id="url-image-preview" alt="URL image preview" />
@@ -108,8 +108,8 @@
 				<label for="upload-image-input">Select image file</label>
 				<input id="upload-image-input" type="file" accept="image/*">
 				<div class="row upload-actions-row">
-					<button id="add-upload-image-button">Upload image</button>
-					<button id="clear-upload-images-button">Clear uploaded list</button>
+					<button id="add-upload-image-button" class="icon-btn" title="Upload image"><i data-lucide="cloud-upload"></i></button>
+					<button id="clear-upload-images-button" class="icon-btn" title="Clear uploaded list"><i data-lucide="trash-2"></i></button>
 				</div>
 				<ul id="upload-images-list"></ul>
 			</div>
@@ -129,12 +129,12 @@
 			</div>
 			<p id="current-image-name">No image</p>
 			<div class="controls controls-primary">
-				<button id="prev-button">Previous (C)</button>
-				<button id="toggle-button" class="button-primary">Start/Stop (A)</button>
-				<button id="next-button">Next (B)</button>
+				<button id="prev-button" class="icon-btn" title="Previous (C)"><i data-lucide="skip-back"></i></button>
+				<button id="toggle-button" class="icon-btn" title="Start slideshow (A)"><i data-lucide="play"></i></button>
+				<button id="next-button" class="icon-btn" title="Next (B)"><i data-lucide="skip-forward"></i></button>
 			</div>
 			<div class="controls controls-secondary">
-				<button id="cycle-button">Cycle mode (D)</button>
+				<button id="cycle-button" class="icon-btn" title="Cycle mode (D)"><i data-lucide="repeat"></i></button>
 				<button id="reshuffle-button">Reshuffle</button>
 			</div>
 		</section>
