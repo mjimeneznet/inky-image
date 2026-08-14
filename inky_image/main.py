@@ -10,6 +10,8 @@ from pathlib import Path
 
 from waitress import serve
 
+from abc import ABC, abstractmethod
+
 from inky_image.button_handler import ButtonHandler
 from inky_image.config import ConfigManager
 from inky_image.display import DisplayManager
@@ -25,7 +27,26 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class Application:
+class Renderer(ABC):
+    """Interface for display rendering operations."""
+
+    @abstractmethod
+    def render_current_image(self) -> bool: ...
+
+    @abstractmethod
+    def render_next_image(self) -> bool: ...
+
+    @abstractmethod
+    def render_previous_image(self) -> bool: ...
+
+    @abstractmethod
+    def cycle_mode_and_render(self) -> bool: ...
+
+    @abstractmethod
+    def get_last_rendered_image_path(self) -> str | None: ...
+
+
+class Application(Renderer):
 	"""Coordinates display, buttons, slideshow and web UI."""
 
 	def __init__(self) -> None:
@@ -50,11 +71,7 @@ class Application:
 			config=self.config,
 			image_manager=self.image_manager,
 			slideshow=self.slideshow,
-			render_current_image=self.render_current_image,
-			render_next_image=self.render_next_image,
-			render_previous_image=self.render_previous_image,
-			cycle_mode_and_render=self.cycle_mode_and_render,
-			get_last_rendered_image_path=self.get_last_rendered_image_path,
+			renderer=self,
 		)
 
 	def render_current_image(self) -> bool:

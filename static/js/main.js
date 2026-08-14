@@ -73,254 +73,217 @@ async function activateMode(mode) {
 	);
 }
 
-function renderDirectories(status) {
-	const list = document.getElementById("directories-list");
+function renderListItems(list, items) {
 	list.innerHTML = "";
-	(status.directories || []).forEach((path, index) => {
-		const item = document.createElement("li");
-		item.className = "dir-item";
-		if (index === status.active_directory_index) {
-			item.classList.add("active");
+	items.forEach((item) => {
+		const li = document.createElement("li");
+		li.className = "dir-item";
+		if (item.isActive) {
+			li.classList.add("active");
 		}
 
 		const name = document.createElement("span");
-		name.textContent = path;
-		item.appendChild(name);
+		name.textContent = item.label;
+		li.appendChild(name);
 
 		const actions = document.createElement("div");
 		actions.className = "row";
 
 		const activate = document.createElement("button");
-		const isActive = index === status.active_directory_index;
-		activate.textContent = isActive ? "Deactivate" : "Activate";
-		activate.onclick = async () => {
-			await runUiAction(
-				async () => {
-					const endpoint = isActive
-						? `/api/directories/${index}/deactivate`
-						: `/api/directories/${index}/activate`;
-					await api(endpoint, { method: "POST" });
-					await refreshStatus();
-				},
-				{
-					startMessage: isActive
-						? "Deactivating directory and showing no-image..."
-						: "Activating directory and refreshing display...",
-				}
-			);
-		};
-
-		const remove = document.createElement("button");
-		remove.textContent = "Remove";
-		remove.onclick = async () => {
-			await runUiAction(async () => {
-				await api(`/api/directories/${index}`, { method: "DELETE" });
-				await refreshStatus();
-			}, { startMessage: "Removing directory..." });
-		};
-
+		activate.textContent = item.isActive ? "Deactivate" : "Activate";
+		activate.onclick = item.isActive ? item.onDeactivate : item.onActivate;
 		actions.appendChild(activate);
+
 		const menu = document.createElement("details");
 		menu.className = "row-actions-menu";
 		const menuSummary = document.createElement("summary");
 		menuSummary.textContent = "More";
 		const menuBody = document.createElement("div");
 		menuBody.className = "row actions-popover";
+		if (item.onPreview) {
+			const preview = document.createElement("button");
+			preview.textContent = "Preview";
+			preview.onclick = item.onPreview;
+			menuBody.appendChild(preview);
+		}
+		const remove = document.createElement("button");
+		remove.textContent = "Remove";
+		remove.onclick = item.onRemove;
 		menuBody.appendChild(remove);
 		menu.appendChild(menuSummary);
 		menu.appendChild(menuBody);
 		actions.appendChild(menu);
-		item.appendChild(actions);
-		list.appendChild(item);
+
+		li.appendChild(actions);
+		list.appendChild(li);
 	});
+}
+
+function renderDirectories(status) {
+	const items = (status.directories || []).map((path, index) => {
+		const isActive = index === status.active_directory_index;
+		return {
+			label: path,
+			isActive,
+			onActivate: async () => {
+				await runUiAction(
+					async () => {
+						await api(`/api/directories/${index}/activate`, { method: "POST" });
+						await refreshStatus();
+					},
+					{ startMessage: "Activating directory and refreshing display..." }
+				);
+			},
+			onDeactivate: async () => {
+				await runUiAction(
+					async () => {
+						await api(`/api/directories/${index}/deactivate`, { method: "POST" });
+						await refreshStatus();
+					},
+					{ startMessage: "Deactivating directory and showing no-image..." }
+				);
+			},
+			onRemove: async () => {
+				await runUiAction(
+					async () => {
+						await api(`/api/directories/${index}`, { method: "DELETE" });
+						await refreshStatus();
+					},
+					{ startMessage: "Removing directory..." }
+				);
+			},
+		};
+	});
+	renderListItems(document.getElementById("directories-list"), items);
 }
 
 function renderSelectedImages(status) {
 	const list = document.getElementById("selected-images-list");
-	list.innerHTML = "";
 	const hasActiveImage = status.mode === "image_list" && Number(status.current_image_index ?? -1) >= 0;
-	(status.selected_images || []).forEach((path, index) => {
-		const item = document.createElement("li");
-		item.className = "dir-item";
+	const items = (status.selected_images || []).map((path, index) => {
 		const isActive = hasActiveImage && index === Number(status.current_image_index ?? -1);
-		if (isActive) {
-			item.classList.add("active");
-		}
-		const name = document.createElement("span");
-		name.textContent = path;
-		item.appendChild(name);
-		const actions = document.createElement("div");
-		actions.className = "row";
-		const preview = document.createElement("button");
-		preview.textContent = "Preview";
-		preview.onclick = () => {
-			previews.setListPreview("image_list", "local", path);
+		return {
+			label: path,
+			isActive,
+			onPreview: () => {
+				previews.setListPreview("image_list", "local", path);
+			},
+			onActivate: async () => {
+				await runUiAction(
+					async () => {
+						await api(`/api/images/${index}/activate`, { method: "POST" });
+						await refreshStatus();
+					},
+					{ startMessage: "Activating selected image and refreshing display..." }
+				);
+			},
+			onDeactivate: async () => {
+				await runUiAction(
+					async () => {
+						await api(`/api/images/${index}/deactivate`, { method: "POST" });
+						await refreshStatus();
+					},
+					{ startMessage: "Deactivating selected image and showing no-image..." }
+				);
+			},
+			onRemove: async () => {
+				await runUiAction(
+					async () => {
+						await api(`/api/images/${index}`, { method: "DELETE" });
+						await refreshStatus();
+					},
+					{ startMessage: "Removing selected image..." }
+				);
+			},
 		};
-		const activate = document.createElement("button");
-		activate.textContent = isActive ? "Deactivate" : "Activate";
-		activate.onclick = async () => {
-			await runUiAction(
-				async () => {
-					const endpoint = isActive ? `/api/images/${index}/deactivate` : `/api/images/${index}/activate`;
-					await api(endpoint, { method: "POST" });
-					await refreshStatus();
-				},
-				{
-					startMessage: isActive
-						? "Deactivating selected image and showing no-image..."
-						: "Activating selected image and refreshing display...",
-				}
-			);
-		};
-		const remove = document.createElement("button");
-		remove.textContent = "Remove";
-		remove.onclick = async () => {
-			await runUiAction(async () => {
-				await api(`/api/images/${index}`, { method: "DELETE" });
-				await refreshStatus();
-			}, { startMessage: "Removing selected image..." });
-		};
-		actions.appendChild(activate);
-		const menu = document.createElement("details");
-		menu.className = "row-actions-menu";
-		const menuSummary = document.createElement("summary");
-		menuSummary.textContent = "More";
-		const menuBody = document.createElement("div");
-		menuBody.className = "row actions-popover";
-		menuBody.appendChild(preview);
-		menuBody.appendChild(remove);
-		menu.appendChild(menuSummary);
-		menu.appendChild(menuBody);
-		actions.appendChild(menu);
-		item.appendChild(actions);
-		list.appendChild(item);
 	});
+	renderListItems(list, items);
 }
 
 function renderUrlImages(status) {
 	const list = document.getElementById("url-images-list");
-	list.innerHTML = "";
 	const hasActiveImage = status.mode === "url" && Number(status.url_active_index || -1) >= 0;
-	(status.url_images || []).forEach((url, index) => {
-		const item = document.createElement("li");
-		item.className = "dir-item";
+	const items = (status.url_images || []).map((url, index) => {
 		const isActive = hasActiveImage && index === Number(status.url_active_index || -1);
-		if (isActive) {
-			item.classList.add("active");
-		}
-		const name = document.createElement("span");
-		name.textContent = url;
-		item.appendChild(name);
-		const actions = document.createElement("div");
-		actions.className = "row";
-		const preview = document.createElement("button");
-		preview.textContent = "Preview";
-		preview.onclick = () => {
-			previews.setListPreview("url", "remote", url);
+		return {
+			label: url,
+			isActive,
+			onPreview: () => {
+				previews.setListPreview("url", "remote", url);
+			},
+			onActivate: async () => {
+				await runUiAction(
+					async () => {
+						await api(`/api/url-images/${index}/activate`, { method: "POST" });
+						await refreshStatus();
+					},
+					{ startMessage: "Activating URL image and refreshing display..." }
+				);
+			},
+			onDeactivate: async () => {
+				await runUiAction(
+					async () => {
+						await api(`/api/url-images/${index}/deactivate`, { method: "POST" });
+						await refreshStatus();
+					},
+					{ startMessage: "Deactivating URL image and showing no-image..." }
+				);
+			},
+			onRemove: async () => {
+				await runUiAction(
+					async () => {
+						await api(`/api/url-images/${index}`, { method: "DELETE" });
+						await refreshStatus();
+					},
+					{ startMessage: "Removing URL image..." }
+				);
+			},
 		};
-		const activate = document.createElement("button");
-		activate.textContent = isActive ? "Deactivate" : "Activate";
-		activate.onclick = async () => {
-			await runUiAction(
-				async () => {
-					const endpoint = isActive ? `/api/url-images/${index}/deactivate` : `/api/url-images/${index}/activate`;
-					await api(endpoint, { method: "POST" });
-					await refreshStatus();
-				},
-				{
-					startMessage: isActive
-						? "Deactivating URL image and showing no-image..."
-						: "Activating URL image and refreshing display...",
-				}
-			);
-		};
-		const remove = document.createElement("button");
-		remove.textContent = "Remove";
-		remove.onclick = async () => {
-			await runUiAction(async () => {
-				await api(`/api/url-images/${index}`, { method: "DELETE" });
-				await refreshStatus();
-			}, { startMessage: "Removing URL image..." });
-		};
-		actions.appendChild(activate);
-		const menu = document.createElement("details");
-		menu.className = "row-actions-menu";
-		const menuSummary = document.createElement("summary");
-		menuSummary.textContent = "More";
-		const menuBody = document.createElement("div");
-		menuBody.className = "row actions-popover";
-		menuBody.appendChild(preview);
-		menuBody.appendChild(remove);
-		menu.appendChild(menuSummary);
-		menu.appendChild(menuBody);
-		actions.appendChild(menu);
-		item.appendChild(actions);
-		list.appendChild(item);
 	});
+	renderListItems(list, items);
 }
 
 function renderUploadImages(status) {
 	const list = document.getElementById("upload-images-list");
-	list.innerHTML = "";
 	const hasActiveImage = status.mode === "upload" && Number(status.upload_active_index || -1) >= 0;
-	(status.uploaded_images || []).forEach((path, index) => {
-		const item = document.createElement("li");
-		item.className = "dir-item";
+	const items = (status.uploaded_images || []).map((path, index) => {
 		const isActive = hasActiveImage && index === Number(status.upload_active_index || -1);
-		if (isActive) {
-			item.classList.add("active");
-		}
-		const name = document.createElement("span");
-		name.textContent = path;
-		item.appendChild(name);
-		const actions = document.createElement("div");
-		actions.className = "row";
-		const preview = document.createElement("button");
-		preview.textContent = "Preview";
-		preview.onclick = () => {
-			previews.setListPreview("upload", "local", path);
+		return {
+			label: path,
+			isActive,
+			onPreview: () => {
+				previews.setListPreview("upload", "local", path);
+			},
+			onActivate: async () => {
+				await runUiAction(
+					async () => {
+						await api(`/api/upload-images/${index}/activate`, { method: "POST" });
+						await refreshStatus();
+					},
+					{ startMessage: "Activating uploaded image and refreshing display..." }
+				);
+			},
+			onDeactivate: async () => {
+				await runUiAction(
+					async () => {
+						await api(`/api/upload-images/${index}/deactivate`, { method: "POST" });
+						await refreshStatus();
+					},
+					{ startMessage: "Deactivating uploaded image and showing no-image..." }
+				);
+			},
+			onRemove: async () => {
+				await runUiAction(
+					async () => {
+						await api(`/api/upload-images/${index}`, { method: "DELETE" });
+						await refreshStatus();
+					},
+					{ startMessage: "Removing uploaded image..." }
+				);
+			},
 		};
-		const activate = document.createElement("button");
-		activate.textContent = isActive ? "Deactivate" : "Activate";
-		activate.onclick = async () => {
-			await runUiAction(
-				async () => {
-					const endpoint = isActive
-						? `/api/upload-images/${index}/deactivate`
-						: `/api/upload-images/${index}/activate`;
-					await api(endpoint, { method: "POST" });
-					await refreshStatus();
-				},
-				{
-					startMessage: isActive
-						? "Deactivating uploaded image and showing no-image..."
-						: "Activating uploaded image and refreshing display...",
-				}
-			);
-		};
-		const remove = document.createElement("button");
-		remove.textContent = "Remove";
-		remove.onclick = async () => {
-			await runUiAction(async () => {
-				await api(`/api/upload-images/${index}`, { method: "DELETE" });
-				await refreshStatus();
-			}, { startMessage: "Removing uploaded image..." });
-		};
-		actions.appendChild(activate);
-		const menu = document.createElement("details");
-		menu.className = "row-actions-menu";
-		const menuSummary = document.createElement("summary");
-		menuSummary.textContent = "More";
-		const menuBody = document.createElement("div");
-		menuBody.className = "row actions-popover";
-		menuBody.appendChild(preview);
-		menuBody.appendChild(remove);
-		menu.appendChild(menuSummary);
-		menu.appendChild(menuBody);
-		actions.appendChild(menu);
-		item.appendChild(actions);
-		list.appendChild(item);
 	});
+	renderListItems(list, items);
 }
 
 function applyModeUiState(status) {

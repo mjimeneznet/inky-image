@@ -11,6 +11,7 @@ from flask import Flask, jsonify, render_template, request, send_file
 
 from inky_image.config import ConfigManager
 from inky_image.image_manager import ImageManager, SUPPORTED_EXTENSIONS
+from inky_image.main import Renderer
 from inky_image.slideshow import SlideshowController
 
 
@@ -44,11 +45,7 @@ def create_web_app(
     config: ConfigManager,
     image_manager: ImageManager,
     slideshow: SlideshowController,
-    render_current_image: Callable[[], bool],
-    render_next_image: Callable[[], bool],
-    render_previous_image: Callable[[], bool],
-    cycle_mode_and_render: Callable[[], bool],
-    get_last_rendered_image_path: Callable[[], str | None],
+    renderer: Renderer,
 ) -> Flask:
     """Create Flask app with all UI and API routes."""
     placeholder_path = (
@@ -62,6 +59,42 @@ def create_web_app(
         template_folder=str(Path(__file__).resolve().parent.parent / "templates"),
         static_folder=str(Path(__file__).resolve().parent.parent / "static"),
     )
+
+    def _handle_remove_aftermath(
+        manager: ImageManager, mode: str, count_key: str
+    ) -> None:
+        """After removing items, stop the slideshow if the pool is now empty."""
+        status = manager.get_status()
+        if manager.get_mode() == mode and int(status.get(count_key, 0)) == 0:
+            slideshow.stop()
+            config.set("slideshow_running", False)
+            renderer.render_current_image()
+
+    def _handle_activate(
+        manager: ImageManager,
+        activate_fn: Callable[[int], bool],
+        index: int,
+        error_msg: str,
+    ):
+        """Activate an item, re-render and return the standard JSON response."""
+        if not activate_fn(index):
+            return jsonify({"ok": False, "error": error_msg}), 400
+        renderer.render_current_image()
+        return jsonify({"ok": True, "status": manager.get_status()})
+
+    def _handle_deactivate(
+        manager: ImageManager,
+        deactivate_fn: Callable[[int], bool],
+        index: int,
+        error_msg: str,
+    ):
+        """Deactivate an item, stop the slideshow, re-render and respond."""
+        if not deactivate_fn(index):
+            return jsonify({"ok": False, "error": error_msg}), 400
+        slideshow.stop()
+        config.set("slideshow_running", False)
+        renderer.render_current_image()
+        return jsonify({"ok": True, "status": manager.get_status()})
 
     @app.get("/")
     def index():
@@ -250,16 +283,17 @@ def create_web_app(
         if image_manager.get_active_directory() is None:
             slideshow.stop()
             config.set("slideshow_running", False)
-            render_current_image()
+            renderer.render_current_image()
         return jsonify({"ok": True, "status": image_manager.get_status()})
 
     @app.post("/api/directories/<int:index>/activate")
     def activate_directory(index: int):
-        ok = image_manager.set_active_directory(index)
-        if not ok:
-            return jsonify({"ok": False, "error": "Invalid directory index"}), 400
-        render_current_image()
-        return jsonify({"ok": True, "status": image_manager.get_status()})
+        return _handle_activate(
+            image_manager,
+            image_manager.set_active_directory,
+            index,
+            "Invalid directory index",
+        )
 
     @app.post("/api/mode")
     def set_mode():
@@ -270,7 +304,7 @@ def create_web_app(
         ok = image_manager.set_mode(mode)
         if not ok:
             return jsonify({"ok": False, "error": "Failed to set mode"}), 400
-        render_current_image()
+        renderer.render_current_image()
         return jsonify({"ok": True, "status": image_manager.get_status()})
 
     @app.post("/api/images")
@@ -291,42 +325,32 @@ def create_web_app(
         ok = image_manager.remove_selected_image(index)
         if not ok:
             return jsonify({"ok": False, "error": "Invalid image index"}), 400
-        status = image_manager.get_status()
-        if (
-            image_manager.get_mode() == "image_list"
-            and int(status.get("image_count", 0)) == 0
-        ):
-            slideshow.stop()
-            config.set("slideshow_running", False)
-            render_current_image()
-        return jsonify({"ok": True, "status": status})
+        _handle_remove_aftermath(image_manager, "image_list", "image_count")
+        return jsonify({"ok": True, "status": image_manager.get_status()})
 
     @app.post("/api/images/clear")
     def clear_images():
         image_manager.clear_selected_images()
-        if image_manager.get_mode() == "image_list":
-            slideshow.stop()
-            config.set("slideshow_running", False)
-            render_current_image()
+        _handle_remove_aftermath(image_manager, "image_list", "image_count")
         return jsonify({"ok": True, "status": image_manager.get_status()})
 
     @app.post("/api/images/<int:index>/activate")
     def activate_selected_image(index: int):
-        ok = image_manager.activate_selected_image(index)
-        if not ok:
-            return jsonify({"ok": False, "error": "Invalid selected image index"}), 400
-        render_current_image()
-        return jsonify({"ok": True, "status": image_manager.get_status()})
+        return _handle_activate(
+            image_manager,
+            image_manager.activate_selected_image,
+            index,
+            "Invalid selected image index",
+        )
 
     @app.post("/api/images/<int:index>/deactivate")
     def deactivate_selected_image(index: int):
-        ok = image_manager.deactivate_selected_image(index)
-        if not ok:
-            return jsonify({"ok": False, "error": "Selected image is not active"}), 400
-        slideshow.stop()
-        config.set("slideshow_running", False)
-        render_current_image()
-        return jsonify({"ok": True, "status": image_manager.get_status()})
+        return _handle_deactivate(
+            image_manager,
+            image_manager.deactivate_selected_image,
+            index,
+            "Selected image is not active",
+        )
 
     @app.post("/api/url-images")
     def add_url_image():
@@ -347,41 +371,31 @@ def create_web_app(
         ok = image_manager.remove_url_image(index)
         if not ok:
             return jsonify({"ok": False, "error": "Invalid URL image index"}), 400
-        status = image_manager.get_status()
-        if (
-            image_manager.get_mode() == "url"
-            and int(status.get("url_images_count", 0)) == 0
-        ):
-            slideshow.stop()
-            config.set("slideshow_running", False)
-            render_current_image()
-        return jsonify({"ok": True, "status": status})
+        _handle_remove_aftermath(image_manager, "url", "url_images_count")
+        return jsonify({"ok": True, "status": image_manager.get_status()})
 
     @app.post("/api/url-images/<int:index>/activate")
     def activate_url_image(index: int):
-        ok = image_manager.activate_url_image(index)
-        if not ok:
-            return jsonify({"ok": False, "error": "Invalid URL image index"}), 400
-        render_current_image()
-        return jsonify({"ok": True, "status": image_manager.get_status()})
+        return _handle_activate(
+            image_manager,
+            image_manager.activate_url_image,
+            index,
+            "Invalid URL image index",
+        )
 
     @app.post("/api/url-images/<int:index>/deactivate")
     def deactivate_url_image(index: int):
-        ok = image_manager.deactivate_url_image(index)
-        if not ok:
-            return jsonify({"ok": False, "error": "URL image is not active"}), 400
-        slideshow.stop()
-        config.set("slideshow_running", False)
-        render_current_image()
-        return jsonify({"ok": True, "status": image_manager.get_status()})
+        return _handle_deactivate(
+            image_manager,
+            image_manager.deactivate_url_image,
+            index,
+            "URL image is not active",
+        )
 
     @app.post("/api/url-images/clear")
     def clear_url_images():
         image_manager.clear_url_images()
-        if image_manager.get_mode() == "url":
-            slideshow.stop()
-            config.set("slideshow_running", False)
-            render_current_image()
+        _handle_remove_aftermath(image_manager, "url", "url_images_count")
         return jsonify({"ok": True, "status": image_manager.get_status()})
 
     @app.post("/api/upload-images")
@@ -399,7 +413,7 @@ def create_web_app(
                 {"ok": False, "error": "Uploaded file is invalid or could not be saved"}
             ), 400
         if image_manager.get_mode() == "upload":
-            render_current_image()
+            renderer.render_current_image()
         return jsonify({"ok": True, "status": image_manager.get_status()})
 
     @app.delete("/api/upload-images/<int:index>")
@@ -407,52 +421,41 @@ def create_web_app(
         ok = image_manager.remove_uploaded_image(index)
         if not ok:
             return jsonify({"ok": False, "error": "Invalid uploaded image index"}), 400
-        status = image_manager.get_status()
-        if (
-            image_manager.get_mode() == "upload"
-            and int(status.get("uploaded_images_count", 0)) == 0
-        ):
-            slideshow.stop()
-            config.set("slideshow_running", False)
-            render_current_image()
-        return jsonify({"ok": True, "status": status})
+        _handle_remove_aftermath(image_manager, "upload", "uploaded_images_count")
+        return jsonify({"ok": True, "status": image_manager.get_status()})
 
     @app.post("/api/upload-images/<int:index>/activate")
     def activate_upload_image(index: int):
-        ok = image_manager.activate_uploaded_image(index)
-        if not ok:
-            return jsonify({"ok": False, "error": "Invalid uploaded image index"}), 400
-        render_current_image()
-        return jsonify({"ok": True, "status": image_manager.get_status()})
+        return _handle_activate(
+            image_manager,
+            image_manager.activate_uploaded_image,
+            index,
+            "Invalid uploaded image index",
+        )
 
     @app.post("/api/upload-images/<int:index>/deactivate")
     def deactivate_upload_image(index: int):
-        ok = image_manager.deactivate_uploaded_image(index)
-        if not ok:
-            return jsonify({"ok": False, "error": "Uploaded image is not active"}), 400
-        slideshow.stop()
-        config.set("slideshow_running", False)
-        render_current_image()
-        return jsonify({"ok": True, "status": image_manager.get_status()})
+        return _handle_deactivate(
+            image_manager,
+            image_manager.deactivate_uploaded_image,
+            index,
+            "Uploaded image is not active",
+        )
 
     @app.post("/api/upload-images/clear")
     def clear_upload_images():
         image_manager.clear_uploaded_images()
-        if image_manager.get_mode() == "upload":
-            slideshow.stop()
-            config.set("slideshow_running", False)
-            render_current_image()
+        _handle_remove_aftermath(image_manager, "upload", "uploaded_images_count")
         return jsonify({"ok": True, "status": image_manager.get_status()})
 
     @app.post("/api/directories/<int:index>/deactivate")
     def deactivate_directory(index: int):
-        ok = image_manager.deactivate_directory(index)
-        if not ok:
-            return jsonify({"ok": False, "error": "Directory is not active"}), 400
-        slideshow.stop()
-        config.set("slideshow_running", False)
-        render_current_image()
-        return jsonify({"ok": True, "status": image_manager.get_status()})
+        return _handle_deactivate(
+            image_manager,
+            image_manager.deactivate_directory,
+            index,
+            "Directory is not active",
+        )
 
     @app.post("/api/slideshow/toggle")
     def toggle_slideshow():
@@ -462,12 +465,12 @@ def create_web_app(
 
     @app.post("/api/slideshow/next")
     def next_image():
-        ok = render_next_image()
+        ok = renderer.render_next_image()
         return jsonify({"ok": ok, "status": image_manager.get_status()})
 
     @app.post("/api/slideshow/prev")
     def previous_image():
-        ok = render_previous_image()
+        ok = renderer.render_previous_image()
         return jsonify({"ok": ok, "status": image_manager.get_status()})
 
     @app.post("/api/settings")
@@ -522,7 +525,7 @@ def create_web_app(
                 or "render_width" in updates
                 or "render_height" in updates
             ):
-                render_current_image()
+                renderer.render_current_image()
 
         return jsonify(
             {
@@ -534,7 +537,7 @@ def create_web_app(
 
     @app.post("/api/folder/cycle")
     def cycle_folder():
-        ok = cycle_mode_and_render()
+        ok = renderer.cycle_mode_and_render()
         return jsonify(
             {
                 "ok": ok,
@@ -547,12 +550,12 @@ def create_web_app(
     def reshuffle_slideshow():
         ok = image_manager.reshuffle()
         if ok:
-            render_current_image()
+            renderer.render_current_image()
         return jsonify({"ok": ok, "status": image_manager.get_status()})
 
     @app.get("/api/current-image")
     def current_image():
-        image_path = get_last_rendered_image_path()
+        image_path = renderer.get_last_rendered_image_path()
         if not image_path:
             if placeholder_path.exists():
                 return send_file(placeholder_path, mimetype="image/*")

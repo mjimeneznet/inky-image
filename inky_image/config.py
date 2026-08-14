@@ -9,6 +9,13 @@ from pathlib import Path
 from typing import Any
 
 
+MODE_LIST_MAP: dict[str, str] = {
+    "image_list": "selected_images",
+    "url": "url_images",
+    "upload": "uploaded_images",
+}
+
+
 DEFAULT_CONFIG = {
     "directories": [],
     "active_directory_index": -1,
@@ -46,7 +53,15 @@ def _safe_float(value: Any, default: float) -> float:
 
 
 class ConfigManager:
-    """Thread-safe JSON config manager."""
+    """Thread-safe JSON config manager.
+
+    Note on lock ordering:
+    ConfigManager._lock must never be acquired while holding
+    ImageManager._lock.  The correct order is
+    ImageManager._lock -> ConfigManager._lock.
+    Any external code holding a ConfigManager lock must not call into
+    ImageManager.
+    """
 
     def __init__(self, config_path: str | None = None) -> None:
         default_path = os.environ.get(
@@ -173,6 +188,8 @@ class ConfigManager:
     def set(self, key: str, value: Any, persist: bool = True) -> None:
         """Set one config value."""
         with self._lock:
+            if key in self._data and self._data[key] == value:
+                return
             self._data[key] = value
             self._sync_indexes()
             if persist:
@@ -181,7 +198,14 @@ class ConfigManager:
     def update(self, values: dict[str, Any], persist: bool = True) -> None:
         """Set multiple config values."""
         with self._lock:
-            self._data.update(values)
+            changed = {
+                k: v
+                for k, v in values.items()
+                if k not in self._data or self._data[k] != v
+            }
+            if not changed:
+                return
+            self._data.update(changed)
             self._sync_indexes()
             if persist:
                 self.save()
@@ -334,8 +358,8 @@ class ConfigManager:
                 return False
             if not Path(normalized).is_file():
                 return False
-            # Keep newest uploads first so they are immediately visible in upload mode.
-            self._data["uploaded_images"].insert(0, normalized)
+            # Keep newest uploads last so order is consistent with URL images.
+            self._data["uploaded_images"].append(normalized)
             self._sync_indexes()
             self.save()
             return True
@@ -373,40 +397,19 @@ class ConfigManager:
 
         mode = str(self._data.get("slideshow_mode", "directory")).strip().lower()
         current_index = _safe_int(self._data.get("current_image_index", 0), 0)
-        if mode == "image_list":
-            selected_images = self._data.get("selected_images", [])
-            if not isinstance(selected_images, list) or not selected_images:
+        source_list_key = MODE_LIST_MAP.get(mode)
+
+        if source_list_key:
+            source_list = self._data.get(source_list_key, [])
+            if not isinstance(source_list, list) or not source_list:
                 self._data["current_image_index"] = 0
                 return
             if current_index < -1:
                 current_index = -1
-            if current_index >= len(selected_images):
-                current_index = len(selected_images) - 1
+            if current_index >= len(source_list):
+                current_index = len(source_list) - 1
             self._data["current_image_index"] = current_index
             return
 
-        if mode == "url":
-            url_images = self._data.get("url_images", [])
-            if not isinstance(url_images, list) or not url_images:
-                self._data["current_image_index"] = 0
-                return
-            if current_index < -1:
-                current_index = -1
-            if current_index >= len(url_images):
-                current_index = len(url_images) - 1
-            self._data["current_image_index"] = current_index
-            return
-
-        if mode == "upload":
-            uploaded_images = self._data.get("uploaded_images", [])
-            if not isinstance(uploaded_images, list) or not uploaded_images:
-                self._data["current_image_index"] = 0
-                return
-            if current_index < -1:
-                current_index = -1
-            if current_index >= len(uploaded_images):
-                current_index = len(uploaded_images) - 1
-            self._data["current_image_index"] = current_index
-            return
-
+        # directory mode (or fallback)
         self._data["current_image_index"] = max(0, current_index)
