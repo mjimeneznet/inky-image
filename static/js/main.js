@@ -39,7 +39,6 @@ async function runUiAction(actionFn, options = {}) {
 	feedback.setUiButtonsDisabled(true);
 	feedback.setTopUiState("busy");
 	feedback.showMessage(startMessage);
-	feedback.setActionStatus(startMessage, true);
 	feedback.showBusyBadge(startMessage);
 	try {
 		return await actionFn();
@@ -51,7 +50,6 @@ async function runUiAction(actionFn, options = {}) {
 		state.uiActionInProgress = false;
 		feedback.setUiButtonsDisabled(false);
 		feedback.setTopUiState("ready");
-		feedback.setActionStatus("Ready", false);
 		applyModeUiState(state.latestStatus || {});
 		browser.updateAddButtonState();
 		feedback.hideBusyBadge();
