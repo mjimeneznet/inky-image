@@ -382,9 +382,7 @@ function applyModeUiState(status) {
 
 async function refreshStatus() {
 	try {
-		console.log("[toast-debug] refreshStatus called, fetching /api/status...");
 		const status = await api("/api/status");
-		console.log("[toast-debug] /api/status received, keys:", Object.keys(status));
 		state.latestStatus = status;
 		renderDirectories(status);
 		renderSelectedImages(status);
@@ -410,16 +408,12 @@ async function refreshStatus() {
 			toggleBtn.innerHTML = "<i data-lucide='" + (isRunning ? "pause" : "play") + "'></i>";
 		}
 		lucide.createIcons();
-		console.log("[toast-debug] status.last_action =", status.last_action);
-		console.log("[toast-debug] state.lastActionTs =", state.lastActionTs);
 		if (status.last_action && status.last_action.ts !== state.lastActionTs) {
 			state.lastActionTs = status.last_action.ts;
 			const labels = { A: "Slideshow toggled", B: "Next image", C: "Previous image", D: "Mode cycled" };
-			console.log("[toast-debug] SHOWING TOAST for", status.last_action.action);
-			feedback.showToast(labels[status.last_action.action] || "Button " + status.last_action.action, "info", 3000);
+				feedback.showToast(labels[status.last_action.action] || "Button " + status.last_action.action, "info", 3000);
 		} else {
-			console.log("[toast-debug] SKIPPING toast. Reason:", status.last_action ? "same ts" : "no last_action");
-		}
+			}
 		if (status.render_in_progress) {
 			feedback.showBusyBadge("Display is refreshing...");
 			if (!state.uiActionInProgress) {
@@ -438,7 +432,6 @@ async function refreshStatus() {
 			feedback.showMessage(status.scan_error);
 		}
 	} catch (error) {
-		console.error("[toast-debug] ERROR in refreshStatus:", error);
 		feedback.showMessage(error.message);
 	}
 }

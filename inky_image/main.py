@@ -190,7 +190,6 @@ class Application(Renderer):
 			return
 		with self._action_lock:
 			self._last_action = {"action": label, "ts": str(time.monotonic())}
-			logger.info("Button %s: _last_action set to %s", label, self._last_action)
 		action()
 
 	def _toggle_slideshow_from_button(self) -> None:
@@ -262,8 +261,6 @@ class Application(Renderer):
 		with self._action_lock:
 			result = self._last_action
 			self._last_action = None
-			if result:
-				logger.info("pop_last_action returning %s (action %s, ts %s)", result, result.get("action"), result.get("ts"))
 			return result
 
 
