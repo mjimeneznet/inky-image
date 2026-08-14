@@ -1,4 +1,8 @@
 export function createFeedback({ formatModeLabel, contrastStorageKey }) {
+	function showMessage(message) {
+		document.getElementById("status-output").textContent = String(message || "");
+	}
+
 	function showToast(message, type = "info", timeoutMs = 2500) {
 		const container = document.getElementById("toast-container");
 		if (!container) {
@@ -27,6 +31,13 @@ export function createFeedback({ formatModeLabel, contrastStorageKey }) {
 		}
 		text.textContent = String(message || "Working...");
 		bar.hidden = !visible;
+	}
+
+	function setTopUiState(stateText) {
+		const uiState = document.getElementById("top-ui-state");
+		if (uiState) {
+			uiState.textContent = String(stateText || "ready");
+		}
 	}
 
 	function updateTopStatus(status) {
@@ -70,6 +81,27 @@ export function createFeedback({ formatModeLabel, contrastStorageKey }) {
 		showToast(enabled ? "High contrast enabled" : "Standard contrast enabled", "info");
 	}
 
+	function showBadge(message, type = "info", timeoutMs = 2200) {
+		showToast(message, type, timeoutMs);
+	}
+
+	function showBusyBadge(message = "Display is refreshing...") {
+		const badge = document.getElementById("ui-badge");
+		if (!badge) {
+			return;
+		}
+		badge.textContent = String(message || "Display is refreshing...");
+		badge.className = "ui-badge visible busy";
+	}
+
+	function hideBusyBadge() {
+		const badge = document.getElementById("ui-badge");
+		if (!badge) {
+			return;
+		}
+		badge.className = "ui-badge";
+	}
+
 	function setUiButtonsDisabled(disabled) {
 		const ids = [
 			"add-directory-button",
@@ -111,12 +143,17 @@ export function createFeedback({ formatModeLabel, contrastStorageKey }) {
 	}
 
 	return {
+		showMessage,
 		showToast,
 		setActionStatus,
+		setTopUiState,
 		updateTopStatus,
 		applySettingsPanelState,
 		applyContrastModeState,
 		setContrastEnabled,
+		showBadge,
+		showBusyBadge,
+		hideBusyBadge,
 		setUiButtonsDisabled,
 	};
 }

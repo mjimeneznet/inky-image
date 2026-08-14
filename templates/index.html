@@ -7,6 +7,7 @@
 	<link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+	<div id="ui-badge" class="ui-badge" aria-live="polite"></div>
 	<button
 		id="settings-toggle"
 		class="settings-toggle"
@@ -23,6 +24,7 @@
 			<div class="status-chip"><span>Active mode</span><strong id="top-active-mode">Directory</strong></div>
 			<div class="status-chip"><span>Slideshow</span><strong id="top-slideshow-state">stopped</strong></div>
 			<div class="status-chip"><span>Buttons</span><strong id="top-lock-state">unlocked</strong></div>
+			<div class="status-chip"><span>UI</span><strong id="top-ui-state">ready</strong></div>
 		</div>
 	</header>
 	<div id="action-status-bar" class="action-status-bar" hidden>
@@ -162,6 +164,7 @@
 			<input id="render-height-input" type="number" min="64" step="1">
 
 			<button id="save-settings-button">Save settings</button>
+			<pre id="status-output"></pre>
 		</section>
 	</main>
 	<div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>

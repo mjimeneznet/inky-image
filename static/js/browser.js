@@ -1,4 +1,4 @@
-export function createBrowser({ state, api, getActiveMode, previews, showToast }) {
+export function createBrowser({ state, api, getActiveMode, previews, showMessage }) {
 	function updateAddButtonState() {
 		const button = document.getElementById("add-directory-button");
 		const mode = getActiveMode();
@@ -108,7 +108,7 @@ export function createBrowser({ state, api, getActiveMode, previews, showToast }
 			previews.refreshPreviewImage();
 			previews.refreshSelectedPreviewImage();
 		} catch (error) {
-			showToast(error.message, "warning");
+			showMessage(error.message);
 		}
 	}
 
