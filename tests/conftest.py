@@ -39,6 +39,7 @@ _SYSTEM_MOCKS: dict[str, MagicMock] = {
     "inky": _inky_mock,
     "inky.auto": MagicMock(),
     "gpiod": _gpiod_mock,
+    "gpiod.line": _gpiod_mock,
     "gpiodevice": _gpiodevice_mock,
 }
 

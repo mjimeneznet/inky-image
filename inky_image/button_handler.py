@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 
 import gpiod
@@ -34,6 +35,10 @@ class ButtonHandler:
 		self._request = None
 		self._offsets: list[int] = []
 		self._last_press = {label: 0.0 for label in LABELS}
+		# Single worker so button actions never overlap. The reader thread
+		# stays free to debounce bounce events even while an e-ink render
+		# (which can take seconds) is running in the worker.
+		self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="button-action")
 
 	def start(self) -> None:
 		"""Start button listening thread."""
@@ -49,6 +54,7 @@ class ButtonHandler:
 		self._stop_event.set()
 		if self._thread and self._thread.is_alive():
 			self._thread.join(timeout=2.0)
+		self._executor.shutdown(wait=False, cancel_futures=True)
 		if self._request is not None:
 			try:
 				self._request.release()
@@ -68,8 +74,9 @@ class ButtonHandler:
 				events = self._read_events()
 				if not events:
 					continue
-				# Drop backlog and process only latest press. This avoids
-				# queued button actions after long e-ink refreshes.
+				# Drop backlog and process only latest press. The executor in
+				# _handle_event keeps the reader free during renders, so this
+				# only guards against bursts between read_edge_events calls.
 				self._handle_event(events[-1])
 			except Exception as exc:  # pragma: no cover - hardware runtime
 				logger.exception("Button handling error: %s", exc)
@@ -95,5 +102,18 @@ class ButtonHandler:
 		logger.info("Button %s pressed", label)
 		callback = self.callbacks.get(label)
 		if callback:
-			callback()
+			# Run on a worker thread so a long e-ink render does not block
+			# this reader loop. While the worker renders, the reader keeps
+			# reading edge events and the debounce check above correctly
+			# drops bounce events from the same physical press. Genuine
+			# repeat presses queue up and run in order after the render.
+			future = self._executor.submit(callback)
+			future.add_done_callback(self._log_action_exception)
+
+	def _log_action_exception(self, future) -> None:
+		"""Log exceptions raised by button action callbacks."""
+		try:
+			future.result()
+		except Exception:  # pragma: no cover - defensive
+			logger.exception("Button action failed")
 
