@@ -1,4 +1,4 @@
-export function createCommandPalette() {
+export function createCommandPalette({ setContrastEnabled }) {
 	let commandPaletteOpen = false;
 	let commandPaletteCommands = [];
 	let commandPaletteFilteredCommands = [];
@@ -110,6 +110,90 @@ export function createCommandPalette() {
 		return commandPaletteFilteredCommands.length;
 	}
 
+	function bindDomEvents() {
+		document.getElementById("command-palette-close").onclick = () => closeCommandPalette();
+		document.getElementById("command-palette-input").oninput = (event) => {
+			renderCommandPaletteList(event.target.value || "");
+		};
+		document.getElementById("command-palette-list").onmousemove = (event) => {
+			const row = event.target.closest(".command-item:not(.empty)");
+			if (!row) {
+				return;
+			}
+			const idx = Number(row.dataset.index);
+			if (Number.isInteger(idx)) {
+				setCommandPaletteActiveIndex(idx);
+			}
+		};
+		document.getElementById("command-palette-overlay").onclick = (event) => {
+			if (event.target.id === "command-palette-overlay") {
+				closeCommandPalette();
+			}
+		};
+
+		document.addEventListener("click", (event) => {
+			if (event.target.closest(".row-actions-menu")) {
+				return;
+			}
+			document.querySelectorAll(".row-actions-menu[open]").forEach((menu) => {
+				menu.removeAttribute("open");
+			});
+		});
+
+		document.addEventListener("keydown", (event) => {
+			const isPaletteShortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
+			if (isPaletteShortcut) {
+				event.preventDefault();
+				if (isOpen()) {
+					closeCommandPalette();
+				} else {
+					openCommandPalette();
+				}
+				return;
+			}
+			const isContrastShortcut = event.altKey && event.key.toLowerCase() === "h";
+			if (isContrastShortcut) {
+				event.preventDefault();
+				setContrastEnabled(!document.body.classList.contains("high-contrast"));
+				return;
+			}
+			if (event.key === "Escape" && isOpen()) {
+				event.preventDefault();
+				closeCommandPalette();
+				return;
+			}
+			if (isOpen() && event.key === "ArrowDown") {
+				event.preventDefault();
+				setCommandPaletteActiveIndex(getActiveIndex() + 1);
+				return;
+			}
+			if (isOpen() && event.key === "ArrowUp") {
+				event.preventDefault();
+				setCommandPaletteActiveIndex(getActiveIndex() - 1);
+				return;
+			}
+			if (isOpen() && event.key === "Home") {
+				event.preventDefault();
+				setCommandPaletteActiveIndex(0);
+				return;
+			}
+			if (isOpen() && event.key === "End") {
+				event.preventDefault();
+				setCommandPaletteActiveIndex(getFilteredLength() - 1);
+				return;
+			}
+			if (isOpen() && event.key === "Enter") {
+				event.preventDefault();
+				const active = document.querySelector(
+					`#command-palette-list .command-item[data-index="${getActiveIndex()}"]:not(.empty)`
+				);
+				if (active) {
+					active.click();
+				}
+			}
+		});
+	}
+
 	return {
 		setCommands,
 		renderCommandPaletteList,
@@ -119,5 +203,6 @@ export function createCommandPalette() {
 		isOpen,
 		getActiveIndex,
 		getFilteredLength,
+		bindDomEvents,
 	};
 }

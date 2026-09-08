@@ -1,4 +1,6 @@
 export function createBrowser({ state, api, getActiveMode, previews, showMessage }) {
+	let browserSelectionByNavigationKey = false;
+
 	function updateAddButtonState() {
 		const button = document.getElementById("add-directory-button");
 		const mode = getActiveMode();
@@ -112,10 +114,113 @@ export function createBrowser({ state, api, getActiveMode, previews, showMessage
 		}
 	}
 
+	function bindDomEvents() {
+		const browserSelect = document.getElementById("browser-directories-select");
+
+		browserSelect.onkeydown = async (event) => {
+			if (["ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"].includes(event.key)) {
+				browserSelectionByNavigationKey = true;
+				return;
+			}
+			if (event.key === "ArrowRight") {
+				const selectedPath = browserSelect.value;
+				if (!selectedPath) {
+					return;
+				}
+				const entry = (state.browserState.filteredEntries || []).find((item) => item.path === selectedPath);
+				if (!entry || entry.type !== "directory") {
+					return;
+				}
+				event.preventDefault();
+				browserSelectionByNavigationKey = false;
+				await browser.loadDirectoryBrowser(entry.path);
+				return;
+			}
+			if (event.key === "ArrowLeft") {
+				const parentPath = String(state.browserState.parentPath || "").trim();
+				if (!parentPath) {
+					return;
+				}
+				event.preventDefault();
+				browserSelectionByNavigationKey = false;
+				await browser.loadDirectoryBrowser(parentPath);
+				return;
+			}
+			if (event.key !== "Enter") {
+				return;
+			}
+			const selectedPath = browserSelect.value;
+			if (!selectedPath) {
+				return;
+			}
+			const entry = (state.browserState.filteredEntries || []).find((item) => item.path === selectedPath);
+			if (!entry || entry.type !== "directory") {
+				return;
+			}
+			event.preventDefault();
+			await browser.loadDirectoryBrowser(entry.path);
+		};
+
+		browserSelect.ondblclick = async () => {
+			const selectedPath = browserSelect.value;
+			if (!selectedPath) {
+				return;
+			}
+			const entry = (state.browserState.filteredEntries || []).find((item) => item.path === selectedPath);
+			if (!entry || entry.type !== "directory") {
+				return;
+			}
+			await browser.loadDirectoryBrowser(entry.path);
+		};
+
+		browserSelect.onchange = async () => {
+			const select = document.getElementById("browser-directories-select");
+			const selectedPath = select.value;
+			if (!selectedPath) {
+				browserSelectionByNavigationKey = false;
+				return;
+			}
+			const entry = (state.browserState.filteredEntries || []).find((item) => item.path === selectedPath);
+			if (!entry) {
+				browserSelectionByNavigationKey = false;
+				return;
+			}
+			state.browserState.selectedEntry = entry;
+			browser.updateAddButtonState();
+			if (entry.type === "image") {
+				browserSelectionByNavigationKey = false;
+				state.selectedPreviewPath = entry.path;
+				previews.refreshSelectedPreviewImage();
+				return;
+			}
+			if (browserSelectionByNavigationKey) {
+				browserSelectionByNavigationKey = false;
+				state.selectedPreviewPath = null;
+				previews.refreshSelectedPreviewImage();
+				return;
+			}
+			browserSelectionByNavigationKey = false;
+			state.selectedPreviewPath = null;
+			previews.refreshSelectedPreviewImage();
+			await browser.loadDirectoryBrowser(entry.path);
+		};
+
+		document.getElementById("browser-filter-input").oninput = () => {
+			const value = document.getElementById("browser-filter-input").value;
+			if (state.browserState.filterTimer) {
+				clearTimeout(state.browserState.filterTimer);
+			}
+			state.browserState.filterTimer = setTimeout(() => {
+				applyDirectoryFilter(value);
+			}, 120);
+		};
+	}
+
 	return {
 		updateAddButtonState,
 		renderFilteredEntries,
 		applyDirectoryFilter,
 		loadDirectoryBrowser,
+		bindDomEvents,
 	};
 }

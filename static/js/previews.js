@@ -108,6 +108,54 @@ export function createPreviews({ state, getActiveMode }) {
 		addButton.disabled = nextState !== "valid";
 	}
 
+	function bindDomEvents() {
+		document.getElementById("url-image-input").oninput = () => {
+			const value = String(document.getElementById("url-image-input").value || "").trim();
+			if (!value) {
+				state.urlPreviewPath = "";
+				setUrlValidationState("neutral", "Enter a valid http/https image URL.");
+				refreshUrlPreviewImage();
+				return;
+			}
+			try {
+				const parsed = new URL(value);
+				if (!["http:", "https:"].includes(parsed.protocol)) {
+					state.urlPreviewPath = "";
+					setUrlValidationState("invalid", "Only http/https URLs are allowed.");
+					refreshUrlPreviewImage();
+					return;
+				}
+				state.urlPreviewPath = value;
+				setUrlValidationState("valid", "URL looks valid. You can add it.");
+				refreshUrlPreviewImage();
+			} catch (_error) {
+				state.urlPreviewPath = "";
+				setUrlValidationState("invalid", "Invalid URL format.");
+				refreshUrlPreviewImage();
+			}
+		};
+
+		document.getElementById("url-image-preview").onload = () => {
+			document.getElementById("url-image-preview").hidden = false;
+			document.getElementById("url-preview-fallback").hidden = true;
+		};
+
+		document.getElementById("url-image-preview").onerror = () => {
+			document.getElementById("url-image-preview").hidden = true;
+			document.getElementById("url-preview-fallback").hidden = false;
+		};
+
+		document.getElementById("list-preview-image").onload = () => {
+			document.getElementById("list-preview-image").hidden = false;
+			document.getElementById("list-preview-fallback").hidden = true;
+		};
+
+		document.getElementById("list-preview-image").onerror = () => {
+			document.getElementById("list-preview-image").hidden = true;
+			document.getElementById("list-preview-fallback").hidden = false;
+		};
+	}
+
 	return {
 		refreshPreviewImage,
 		refreshSelectedPreviewImage,
@@ -116,5 +164,6 @@ export function createPreviews({ state, getActiveMode }) {
 		setListPreview,
 		refreshListPreviewImage,
 		setUrlValidationState,
+		bindDomEvents,
 	};
 }

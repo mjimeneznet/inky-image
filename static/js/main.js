@@ -26,7 +26,9 @@ const browser = createBrowser({
 	showMessage: feedback.showMessage,
 });
 
-const palette = createCommandPalette();
+const palette = createCommandPalette({
+	setContrastEnabled: feedback.setContrastEnabled,
+});
 
 async function runUiAction(actionFn, options = {}) {
 	if (state.uiActionInProgress) {
@@ -411,9 +413,8 @@ async function refreshStatus() {
 		if (status.last_action && status.last_action.ts !== state.lastActionTs) {
 			state.lastActionTs = status.last_action.ts;
 			const labels = { A: "Slideshow toggled", B: "Next image", C: "Previous image", D: "Mode cycled" };
-				feedback.showToast(labels[status.last_action.action] || "Button " + status.last_action.action, "info", 3000);
-		} else {
-			}
+			feedback.showToast(labels[status.last_action.action] || "Button " + status.last_action.action, "info", 3000);
+		}
 		if (status.render_in_progress) {
 			feedback.showBusyBadge("Display is refreshing...");
 			if (!state.uiActionInProgress) {
@@ -436,9 +437,7 @@ async function refreshStatus() {
 	}
 }
 
-function bindEvents() {
-	let browserSelectionByNavigationKey = false;
-
+function bindSourceActions() {
 	document.getElementById("add-directory-button").onclick = async () => {
 		await runUiAction(async () => {
 			const mode = getActiveMode(state);
@@ -532,52 +531,6 @@ function bindEvents() {
 		}, { startMessage: "Clearing uploaded images..." });
 	};
 
-	document.getElementById("url-image-input").oninput = () => {
-		const value = String(document.getElementById("url-image-input").value || "").trim();
-		if (!value) {
-			state.urlPreviewPath = "";
-			previews.setUrlValidationState("neutral", "Enter a valid http/https image URL.");
-			previews.refreshUrlPreviewImage();
-			return;
-		}
-		try {
-			const parsed = new URL(value);
-			if (!["http:", "https:"].includes(parsed.protocol)) {
-				state.urlPreviewPath = "";
-				previews.setUrlValidationState("invalid", "Only http/https URLs are allowed.");
-				previews.refreshUrlPreviewImage();
-				return;
-			}
-			state.urlPreviewPath = value;
-			previews.setUrlValidationState("valid", "URL looks valid. You can add it.");
-			previews.refreshUrlPreviewImage();
-		} catch (_error) {
-			state.urlPreviewPath = "";
-			previews.setUrlValidationState("invalid", "Invalid URL format.");
-			previews.refreshUrlPreviewImage();
-		}
-	};
-
-	document.getElementById("url-image-preview").onload = () => {
-		document.getElementById("url-image-preview").hidden = false;
-		document.getElementById("url-preview-fallback").hidden = true;
-	};
-
-	document.getElementById("url-image-preview").onerror = () => {
-		document.getElementById("url-image-preview").hidden = true;
-		document.getElementById("url-preview-fallback").hidden = false;
-	};
-
-	document.getElementById("list-preview-image").onload = () => {
-		document.getElementById("list-preview-image").hidden = false;
-		document.getElementById("list-preview-fallback").hidden = true;
-	};
-
-	document.getElementById("list-preview-image").onerror = () => {
-		document.getElementById("list-preview-image").hidden = true;
-		document.getElementById("list-preview-fallback").hidden = false;
-	};
-
 	document.getElementById("clear-images-button").onclick = async () => {
 		await runUiAction(async () => {
 			await api("/api/images/clear", { method: "POST" });
@@ -587,107 +540,9 @@ function bindEvents() {
 			await refreshStatus();
 		}, { startMessage: "Clearing selected image list..." });
 	};
+}
 
-	const browserSelect = document.getElementById("browser-directories-select");
-
-	browserSelect.onkeydown = async (event) => {
-		if (["ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"].includes(event.key)) {
-			browserSelectionByNavigationKey = true;
-			return;
-		}
-		if (event.key === "ArrowRight") {
-			const selectedPath = browserSelect.value;
-			if (!selectedPath) {
-				return;
-			}
-			const entry = (state.browserState.filteredEntries || []).find((item) => item.path === selectedPath);
-			if (!entry || entry.type !== "directory") {
-				return;
-			}
-			event.preventDefault();
-			browserSelectionByNavigationKey = false;
-			await browser.loadDirectoryBrowser(entry.path);
-			return;
-		}
-		if (event.key === "ArrowLeft") {
-			const parentPath = String(state.browserState.parentPath || "").trim();
-			if (!parentPath) {
-				return;
-			}
-			event.preventDefault();
-			browserSelectionByNavigationKey = false;
-			await browser.loadDirectoryBrowser(parentPath);
-			return;
-		}
-		if (event.key !== "Enter") {
-			return;
-		}
-		const selectedPath = browserSelect.value;
-		if (!selectedPath) {
-			return;
-		}
-		const entry = (state.browserState.filteredEntries || []).find((item) => item.path === selectedPath);
-		if (!entry || entry.type !== "directory") {
-			return;
-		}
-		event.preventDefault();
-		await browser.loadDirectoryBrowser(entry.path);
-	};
-
-	browserSelect.ondblclick = async () => {
-		const selectedPath = browserSelect.value;
-		if (!selectedPath) {
-			return;
-		}
-		const entry = (state.browserState.filteredEntries || []).find((item) => item.path === selectedPath);
-		if (!entry || entry.type !== "directory") {
-			return;
-		}
-		await browser.loadDirectoryBrowser(entry.path);
-	};
-
-	browserSelect.onchange = async () => {
-		const select = document.getElementById("browser-directories-select");
-		const selectedPath = select.value;
-		if (!selectedPath) {
-			browserSelectionByNavigationKey = false;
-			return;
-		}
-		const entry = (state.browserState.filteredEntries || []).find((item) => item.path === selectedPath);
-		if (!entry) {
-			browserSelectionByNavigationKey = false;
-			return;
-		}
-		state.browserState.selectedEntry = entry;
-		browser.updateAddButtonState();
-		if (entry.type === "image") {
-			browserSelectionByNavigationKey = false;
-			state.selectedPreviewPath = entry.path;
-			previews.refreshSelectedPreviewImage();
-			return;
-		}
-		if (browserSelectionByNavigationKey) {
-			browserSelectionByNavigationKey = false;
-			state.selectedPreviewPath = null;
-			previews.refreshSelectedPreviewImage();
-			return;
-		}
-		browserSelectionByNavigationKey = false;
-		state.selectedPreviewPath = null;
-		previews.refreshSelectedPreviewImage();
-		await browser.loadDirectoryBrowser(entry.path);
-	};
-
-	document.getElementById("browser-filter-input").oninput = () => {
-		const value = document.getElementById("browser-filter-input").value;
-		if (state.browserState.filterTimer) {
-			clearTimeout(state.browserState.filterTimer);
-		}
-		state.browserState.filterTimer = setTimeout(() => {
-			browser.applyDirectoryFilter(value);
-		}, 120);
-	};
-
+function bindModeButtons() {
 	document.querySelectorAll(".mode-button").forEach((button) => {
 		button.onclick = () => {
 			const mode = button.dataset.mode || "directory";
@@ -709,7 +564,9 @@ function bindEvents() {
 			await activateMode(mode);
 		};
 	});
+}
 
+function bindDisplayControls() {
 	document.getElementById("toggle-button").onclick = async () => {
 		await runUiAction(async () => {
 			await api("/api/slideshow/toggle", { method: "POST" });
@@ -769,7 +626,9 @@ function bindEvents() {
 			await refreshStatus();
 		}, { startMessage: "Reshuffling slideshow and refreshing display..." });
 	};
+}
 
+function bindSettingsForm() {
 	document.getElementById("save-settings-button").onclick = async () => {
 		await runUiAction(async () => {
 			const interval = Math.max(30, Number(document.getElementById("interval-input").value));
@@ -804,88 +663,17 @@ function bindEvents() {
 	document.getElementById("high-contrast-input").onchange = (event) => {
 		feedback.setContrastEnabled(Boolean(event.target.checked));
 	};
+}
 
-	document.getElementById("command-palette-close").onclick = () => palette.closeCommandPalette();
-	document.getElementById("command-palette-input").oninput = (event) => {
-		palette.renderCommandPaletteList(event.target.value || "");
-	};
-	document.getElementById("command-palette-list").onmousemove = (event) => {
-		const row = event.target.closest(".command-item:not(.empty)");
-		if (!row) {
-			return;
-		}
-		const idx = Number(row.dataset.index);
-		if (Number.isInteger(idx)) {
-			palette.setCommandPaletteActiveIndex(idx);
-		}
-	};
-	document.getElementById("command-palette-overlay").onclick = (event) => {
-		if (event.target.id === "command-palette-overlay") {
-			palette.closeCommandPalette();
-		}
-	};
+function bindEvents() {
+	browser.bindDomEvents();
+	previews.bindDomEvents();
+	palette.bindDomEvents();
 
-	document.addEventListener("click", (event) => {
-		if (event.target.closest(".row-actions-menu")) {
-			return;
-		}
-		document.querySelectorAll(".row-actions-menu[open]").forEach((menu) => {
-			menu.removeAttribute("open");
-		});
-	});
-
-	document.addEventListener("keydown", (event) => {
-		const isPaletteShortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k";
-		if (isPaletteShortcut) {
-			event.preventDefault();
-			if (palette.isOpen()) {
-				palette.closeCommandPalette();
-			} else {
-				palette.openCommandPalette();
-			}
-			return;
-		}
-		const isContrastShortcut = event.altKey && event.key.toLowerCase() === "h";
-		if (isContrastShortcut) {
-			event.preventDefault();
-			feedback.setContrastEnabled(!document.body.classList.contains("high-contrast"));
-			return;
-		}
-		if (event.key === "Escape" && palette.isOpen()) {
-			event.preventDefault();
-			palette.closeCommandPalette();
-			return;
-		}
-		if (palette.isOpen() && event.key === "ArrowDown") {
-			event.preventDefault();
-			palette.setCommandPaletteActiveIndex(palette.getActiveIndex() + 1);
-			return;
-		}
-		if (palette.isOpen() && event.key === "ArrowUp") {
-			event.preventDefault();
-			palette.setCommandPaletteActiveIndex(palette.getActiveIndex() - 1);
-			return;
-		}
-		if (palette.isOpen() && event.key === "Home") {
-			event.preventDefault();
-			palette.setCommandPaletteActiveIndex(0);
-			return;
-		}
-		if (palette.isOpen() && event.key === "End") {
-			event.preventDefault();
-			palette.setCommandPaletteActiveIndex(palette.getFilteredLength() - 1);
-			return;
-		}
-		if (palette.isOpen() && event.key === "Enter") {
-			event.preventDefault();
-			const active = document.querySelector(
-				`#command-palette-list .command-item[data-index="${palette.getActiveIndex()}"]:not(.empty)`
-			);
-			if (active) {
-				active.click();
-			}
-		}
-	});
+	bindSourceActions();
+	bindModeButtons();
+	bindDisplayControls();
+	bindSettingsForm();
 }
 
 function buildCommandPaletteCommands() {
