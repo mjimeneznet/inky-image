@@ -21,7 +21,9 @@ class DisplayManager:
 
     def __init__(self) -> None:
         if auto is None:
-            raise RuntimeError("inky library is not available. Install dependencies first.")
+            raise RuntimeError(
+                "inky library is not available. Install dependencies first."
+            )
         self._display = auto()
         self._display.set_border(self._display.BLACK)
         self.width = int(self._display.width)
@@ -86,8 +88,11 @@ class DisplayManager:
         height = max(64, height)
         resized = self._resize_image(img, (width, height), scale_to_fit=scale_to_fit)
         if (width, height) != (self.width, self.height):
-            # Keep compatibility with hardware by adapting configured render size to real panel size.
-            return self._resize_image(resized, (self.width, self.height), scale_to_fit=scale_to_fit)
+            # Keep compatibility with hardware by adapting configured render
+            # size to real panel size.
+            return self._resize_image(
+                resized, (self.width, self.height), scale_to_fit=scale_to_fit
+            )
         return resized
 
     @staticmethod

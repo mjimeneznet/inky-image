@@ -1,0 +1,11 @@
+line-length = 88
+target-version = "py39"
+
+[lint]
+# E/W lock in the indentation and formatting convention so tabs cannot come
+# back; F catches unused imports and undefined names.
+select = ["E", "F", "W", "I"]
+
+[lint.per-file-ignores]
+# conftest installs sys.modules mocks before importing test-facing modules.
+"tests/conftest.py" = ["E402", "I001"]

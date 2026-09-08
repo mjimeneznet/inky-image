@@ -1,6 +1,7 @@
 """Flask web UI and API for Inky Image Viewer."""
 
 from __future__ import annotations
+
 import os
 import time
 from collections import deque
@@ -10,7 +11,7 @@ from typing import Callable
 from flask import Flask, jsonify, render_template, request, send_file
 
 from inky_image.config import ConfigManager
-from inky_image.image_manager import ImageManager, SUPPORTED_EXTENSIONS
+from inky_image.image_manager import SUPPORTED_EXTENSIONS, ImageManager
 from inky_image.renderer import Renderer
 from inky_image.slideshow import SlideshowController
 

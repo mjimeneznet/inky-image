@@ -18,7 +18,6 @@ from inky_image.renderer import Renderer
 from inky_image.slideshow import SlideshowController
 from inky_image.web_app import create_web_app
 
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
@@ -39,14 +38,18 @@ class Application(Renderer):
         self._shutdown_event = threading.Event()
         self._button_handler: ButtonHandler | None = None
         self._web_server_failed = False
-        self.no_image_path = Path(__file__).resolve().parent.parent / "static" / "no-image.jpg"
+        self.no_image_path = (
+            Path(__file__).resolve().parent.parent / "static" / "no-image.jpg"
+        )
         self._last_render_signature: tuple[str, float, bool, int, int] | None = None
         self._last_action: dict[str, str] | None = None
         self._action_lock = threading.RLock()
         self._render_in_progress = False
 
         self.slideshow = SlideshowController(
-            interval_seconds_getter=lambda: int(self.config.get("slideshow_interval", 30)),
+            interval_seconds_getter=lambda: int(
+                self.config.get("slideshow_interval", 30)
+            ),
             on_tick=self.render_next_image,
         )
 
@@ -78,11 +81,16 @@ class Application(Renderer):
     def _render_no_image_placeholder_locked(self) -> bool:
         """Render placeholder when no directories are configured."""
         if not self.no_image_path.exists():
-            logger.warning("No directories configured and placeholder missing: %s", self.no_image_path)
+            logger.warning(
+                "No directories configured and placeholder missing: %s",
+                self.no_image_path,
+            )
             return False
         self._render_in_progress = True
         try:
-            return self._render_image_path_locked(str(self.no_image_path), "no-image placeholder")
+            return self._render_image_path_locked(
+                str(self.no_image_path), "no-image placeholder"
+            )
         finally:
             self._render_in_progress = False
 
@@ -108,7 +116,9 @@ class Application(Renderer):
             if not image_path:
                 logger.warning("No previous image to display")
                 return False
-            return self._render_image_path_locked(image_path, "previous image", force=True)
+            return self._render_image_path_locked(
+                image_path, "previous image", force=True
+            )
         finally:
             self._render_lock.release()
 
@@ -127,7 +137,9 @@ class Application(Renderer):
             if not ok:
                 logger.warning("Failed to cycle slideshow mode from %s", current_mode)
                 return False
-            logger.info("Switched slideshow mode from %s to %s", current_mode, next_mode)
+            logger.info(
+                "Switched slideshow mode from %s to %s", current_mode, next_mode
+            )
             image_path = self.image_manager.current_image_path()
             if not image_path:
                 return self._render_no_image_placeholder_locked()
@@ -142,7 +154,9 @@ class Application(Renderer):
             logger.info("Display is busy refreshing, dropping action")
         return acquired
 
-    def _render_image_path_locked(self, image_path: str, label: str, force: bool = False) -> bool:
+    def _render_image_path_locked(
+        self, image_path: str, label: str, force: bool = False
+    ) -> bool:
         """Render image while render lock is held."""
         self._render_in_progress = True
         saturation = float(self.config.get("saturation", 0.5))
@@ -175,7 +189,9 @@ class Application(Renderer):
 
     def _setup_buttons(self) -> None:
         callbacks = {
-            "A": lambda: self._run_button_action("A", self._toggle_slideshow_from_button),
+            "A": lambda: self._run_button_action(
+                "A", self._toggle_slideshow_from_button
+            ),
             "B": lambda: self._run_button_action("B", self.render_next_image),
             "C": lambda: self._run_button_action("C", self.render_previous_image),
             "D": lambda: self._run_button_action("D", self.cycle_mode_and_render),
@@ -222,7 +238,9 @@ class Application(Renderer):
         # screen until an explicit user action or slideshow tick requests a render.
         logger.info("Skipping startup render to speed up service restart")
 
-        web_thread = threading.Thread(target=self._start_web_server, name="web-ui", daemon=True)
+        web_thread = threading.Thread(
+            target=self._start_web_server, name="web-ui", daemon=True
+        )
         web_thread.start()
         logger.info("Web UI started on port %s", self.config.get("web_port", 80))
 

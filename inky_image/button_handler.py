@@ -12,12 +12,13 @@ import gpiod
 import gpiodevice
 from gpiod.line import Bias, Direction, Edge
 
-
 logger = logging.getLogger(__name__)
 
 BUTTONS = [5, 6, 16, 24]
 LABELS = ["A", "B", "C", "D"]
-INPUT = gpiod.LineSettings(direction=Direction.INPUT, bias=Bias.PULL_UP, edge_detection=Edge.FALLING)
+INPUT = gpiod.LineSettings(
+    direction=Direction.INPUT, bias=Bias.PULL_UP, edge_detection=Edge.FALLING
+)
 
 
 class ButtonHandler:
@@ -38,14 +39,18 @@ class ButtonHandler:
         # Single worker so button actions never overlap. The reader thread
         # stays free to debounce bounce events even while an e-ink render
         # (which can take seconds) is running in the worker.
-        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="button-action")
+        self._executor = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="button-action"
+        )
 
     def start(self) -> None:
         """Start button listening thread."""
         if self._thread and self._thread.is_alive():
             return
         self._setup_gpio()
-        self._thread = threading.Thread(target=self._run, name="button-handler", daemon=True)
+        self._thread = threading.Thread(
+            target=self._run, name="button-handler", daemon=True
+        )
         self._thread.start()
         logger.info("Button handler started")
 
@@ -66,7 +71,9 @@ class ButtonHandler:
         chip = gpiodevice.find_chip_by_platform()
         self._offsets = [chip.line_offset_from_id(gpio_id) for gpio_id in BUTTONS]
         line_config = dict.fromkeys(self._offsets, INPUT)
-        self._request = chip.request_lines(consumer="inky-image-buttons", config=line_config)
+        self._request = chip.request_lines(
+            consumer="inky-image-buttons", config=line_config
+        )
 
     def _run(self) -> None:
         while not self._stop_event.is_set():

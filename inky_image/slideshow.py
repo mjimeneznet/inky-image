@@ -6,7 +6,6 @@ import logging
 import threading
 from typing import Callable
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -33,7 +32,9 @@ class SlideshowController:
                 logger.info("Slideshow resumed")
                 return
             self._stop_event.clear()
-            self._thread = threading.Thread(target=self._loop, name="slideshow", daemon=True)
+            self._thread = threading.Thread(
+                target=self._loop, name="slideshow", daemon=True
+            )
             self._thread.start()
             logger.info("Slideshow started")
 

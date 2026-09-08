@@ -6,17 +6,11 @@ these tests run on any machine.  Network access is mocked via unittest.mock.
 
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
-
 from inky_image.image_manager import (
     _DirectorySource,
     _ImageListSource,
-    _UrlSource,
     _UploadSource,
-    SUPPORTED_EXTENSIONS,
+    _UrlSource,
 )
 
 
@@ -98,7 +92,7 @@ class TestUrlSource:
         assert result.error is None
 
     def test_invalid_url_scheme_handled_by_image_manager(self, config, manager):
-        """ImageManager.add_url_image validates the URL scheme before calling the handler."""
+        """ImageManager.add_url_image validates the URL scheme before the handler."""
         # add_url_image in ImageManager checks for http/https scheme
         result = manager.add_url_image("ftp://example.com/img.jpg")
         assert result is False

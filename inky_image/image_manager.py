@@ -17,7 +17,6 @@ from PIL import Image
 
 from inky_image.config import ConfigManager
 
-
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp"}
 
 

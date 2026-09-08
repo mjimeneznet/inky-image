@@ -6,8 +6,6 @@ these tests run on any machine.
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestDirtyFlag:
     """The _dirty flag controls whether refresh_images() rescans sources."""

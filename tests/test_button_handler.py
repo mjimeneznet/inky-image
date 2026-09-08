@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from inky_image.button_handler import ButtonHandler, BUTTONS
+from inky_image.button_handler import BUTTONS, ButtonHandler
 
 
 @pytest.fixture
@@ -62,7 +62,9 @@ class TestDebounce:
         handler._last_press["B"] = time.monotonic() - 0.5
         handler._handle_event(_event(b_offset))
 
-        assert _wait_for(calls, 2), "presses separated by the debounce window must both fire"
+        assert _wait_for(calls, 2), (
+            "presses separated by the debounce window must both fire"
+        )
         assert len(calls) == 2
 
 
@@ -85,7 +87,9 @@ class TestNonBlockingDispatch:
         elapsed = time.monotonic() - t0
 
         assert started.wait(timeout=0.5), "callback should start on the worker thread"
-        assert elapsed < 0.2, "reader thread must return without waiting for the callback"
+        assert elapsed < 0.2, (
+            "reader thread must return without waiting for the callback"
+        )
         release.set()
 
     def test_repeat_presses_queue_in_order(self, handler):

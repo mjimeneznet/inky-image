@@ -6,8 +6,6 @@ these tests run on any machine.
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestNavigationWraps:
     """Next/previous navigation wraps around image list."""
