@@ -108,6 +108,12 @@ Python image viewer for Inky e-ink display on Raspberry Pi (Debian), with:
 
 ## Known Operational Notes
 
+- **The web UI has no authentication and binds all interfaces.**
+	- `main.py` starts waitress with `host="0.0.0.0"` on `web_port` (default **80**), and no route checks credentials.
+	- Consequence: anyone on the LAN can change the slideshow, rewrite `config.json`, add URL images, and read files under the browse roots via `/api/preview-file`.
+	- Accepted deliberately as of 2026-09-08: the intended use is controlling a slideshow from a phone on a trusted home network, so binding to localhost or requiring a token would break the primary workflow.
+	- Mitigations that do exist: `/api/preview-file` only serves files under `INKY_IMAGE_BROWSE_ROOTS`, rejects `..`/absolute/symlink escapes, and requires an image extension (covered by `TestBrowseRootSecurity`). Uploads and URL downloads are capped at 12MB and image-verified, and URL downloads only accept `http`/`https`.
+	- Revisit if the Pi is ever placed on a network that is not fully trusted, or if it gets port-forwarded. A shared token checked in `before_request` (off when empty, so existing setups keep working) is the smallest fix.
 - After UI/JS changes, restart service:
 	- `sudo systemctl restart inky-image.service`
 - Check logs:
@@ -531,3 +537,69 @@ Suggested next resume steps:
 
 ### Validation notes
 - Python syntax check passed after backend changes: `python3 -m compileall inky_image`.
+
+## Progress update (2026-08-14)
+
+### Renderer dependency injection and circular import fix
+- Extracted the `Renderer` ABC into `inky_image/renderer.py` to break the `main.py` <-> `web_app.py` circular import.
+- `Application` implements the protocol; `create_web_app(...)` now receives the renderer as a constructor dependency instead of importing the concrete class.
+- Methods in the protocol: `render_current_image`, `render_next_image`, `render_previous_image`, `cycle_mode_and_render`, `get_last_rendered_image_path`.
+
+### Physical buttons no longer block the GPIO callback
+- Button callbacks run through `_run_button_action(label, action)`. An e-ink render takes 30-45s; running it on the callback thread made button `B` appear to skip images.
+- `_last_action` is now set under `_action_lock` **before** `action()` runs, so the UI learns about the press while the render is still in flight.
+
+### Physical button feedback in the web UI
+- The web UI polls `/api/status`, which exposes `last_action` and `render_in_progress` (atomic `pop_last_action()` on the renderer).
+- `last_action.ts` is compared against `state.lastActionTs` in `refreshStatus()` to fire exactly one toast per press (`A` toggled / `B` next / `C` previous / `D` mode cycled).
+- While `render_in_progress` is true the UI shows a central busy badge ("Display is refreshing...") and disables action buttons, matching the real hardware delay.
+- Gotcha found while debugging: `requestAnimationFrame` does not fire in a backgrounded/occluded browser tab, so the toast was scheduled but never painted. The toast must not depend on rAF to become visible.
+
+### UI work in the same batch
+- Text buttons converted to Lucide icons; `lucide.min.js` vendored at `static/vendor/lucide.min.js` and loaded locally instead of from a CDN.
+- Added Move Up / Move Down row actions to selected images.
+- Unified the feedback system (toast + badge) and dropped a duplicated action-status bar.
+
+## Progress update (2026-09-08)
+
+### Reliability: atomic config writes
+- `ConfigManager.save()` writes `config.json.tmp` in the same directory, `flush()` + `os.fsync()`, then `os.replace()` onto the real path, with `unlink(missing_ok=True)` in a `finally` block.
+- Motivation: the Pi is powered off by unplugging it. A direct `write_text()` could leave truncated JSON on the real path, and `load()` then discards it, silently losing directories, selected images and URL lists.
+- The other disk writes in the codebase (`image_manager.py` URL/upload caches) are self-healing, so no other site needed this treatment.
+
+### Style, lint and CI
+- All Python is now 4-space indented. `button_handler.py`, `display.py`, `main.py`, `slideshow.py` were tab-indented and were converted with `expand -t 4`; `git diff -w` proves those four files changed in whitespace only.
+- Spaces won over tabs because they were already the majority by line count (1988 vs 581) and are PEP 8.
+- Added `ruff.toml`: `line-length = 88`, `target-version = "py39"`, `select = ["E", "F", "W", "I"]`, with per-file ignores for `tests/conftest.py` (`E402`, `I001`) so mock-before-import ordering is preserved.
+- 88 is the convention the code already kept in `config.py` / `web_app.py` / `image_manager.py`. Every over-length line lived in the four never-linted tab files.
+- `pytest` moved from `requirements.txt` to new `requirements-dev.txt` (with `ruff`); the Pi does not need a test runner or linter at runtime.
+- Added `.github/workflows/ci.yml` running `ruff check .` and `pytest -q` on push/PR. Until then tests only ever ran on a laptop.
+
+### Frontend: `bindEvents()` decomposed
+- `static/js/main.js` had a single 451-line `bindEvents()`. DOM wiring moved to the module that already owned the behaviour, each exposing `bindDomEvents()`:
+	- browser select keyboard/mouse navigation and the 120ms filter debounce -> `browser.js`
+	- URL input validation and the two preview `onload`/`onerror` handlers -> `previews.js`
+	- command palette wiring, the global click-away for `.row-actions-menu`, and the global keydown shortcuts -> `palette.js`
+- `bindEvents()` is now a composer calling those three plus four named local functions (`bindSourceActions`, `bindModeButtons`, `bindDisplayControls`, `bindSettingsForm`). Longest function in `main.js` is 104 lines.
+- One new constructor dependency: `createCommandPalette({ setContrastEnabled })`, wired from `feedback`. Safe to pass as a bare function reference because `feedback.js` uses closures, not `this`.
+- Removed the empty `else` branch left behind by the debug-cleanup commit in `refreshStatus()`.
+
+### Security: URL download scheme guard
+- `ImageManager._download_url_image()` now rejects any scheme other than `http`/`https` before building the request. `add_url_image()` already filtered the scheme, but `refresh()` passes stored config entries straight to the downloader, so a hand-edited or legacy `url_images` entry reached `urlopen()` with `file://`.
+- Two regression tests assert `urlopen` is never reached for `file://` and `ftp://`.
+
+### Test coverage: `web_app.py` had none
+- Before this, no test file imported `inky_image/web_app.py` at all, so all 32 Flask routes were protected only by hand-testing.
+- New `tests/test_web_app.py` covers every route, driven by a `client` fixture in `tests/conftest.py` that builds the app with the real `ConfigManager` / `ImageManager` / `SlideshowController` plus a `RendererStub`, and uses `app.test_client()` (no server, no ports, no network).
+- The security-critical route is `/api/preview-file`. Its tests pin `INKY_IMAGE_BROWSE_ROOTS` to a tmp directory and cover: a real file under the root is served byte-for-byte, a directory is 404, a non-image extension is 400, a missing `path` is 400, `..` escape is 403, an absolute path outside the roots is 403, and a symlink inside the root pointing at a `.jpg` outside the root is 403.
+- The symlink test is load-bearing: with `_path_is_under_roots()` forced to return `True`, that same request answers 200 and returns the file's bytes. Without the positive "served byte-for-byte" test, a guard that rejected everything would pass the whole class.
+- `/api/status` now has tests for the physical-button contract: `last_action` is present on exactly one poll and absent afterwards (`pop_last_action()` is destructive, otherwise the UI toasts on every refresh), and `render_in_progress` reaches the client.
+- Suite went 49 -> 108 tests.
+
+### Housekeeping
+- Deleted the committed scratch scripts `.commit_and_push.sh` and `.final_cleanup.sh` (hardcoded absolute paths, `git add -A`, `git commit -n`).
+- Added `<link rel="icon" href="data:,">` to `templates/index.html`; the browser was requesting `/favicon.ico` on every load and logging a 404.
+
+### Validation notes
+- `ruff check .` clean; `pytest -q` green.
+- Frontend refactor proven behaviour-preserving by running the same browser smoke check against `HEAD` and against the working tree and diffing the two outputs (15 interaction assertions, zero console errors on both).

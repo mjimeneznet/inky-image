@@ -104,3 +104,94 @@ def empty_manager(config):
     from inky_image.image_manager import ImageManager
 
     return ImageManager(config)
+
+
+# ---------------------------------------------------------------------------
+# Flask-web-app fixtures — the ``client`` fixture needs a RendererStub so the
+# app can be constructed without a real Inky display.
+# ---------------------------------------------------------------------------
+
+
+class RendererStub:
+    """Minimal Renderer implementation tracking calls for test assertions."""
+
+    def __init__(self) -> None:
+        self.render_current_image_calls = 0
+        self.render_next_image_calls = 0
+        self.render_previous_image_calls = 0
+        self.cycle_mode_and_render_calls = 0
+        self._last_rendered_image_path: str | None = None
+        self._last_action: dict[str, str] | None = None
+        self._render_in_progress = False
+
+    def render_current_image(self) -> bool:
+        self.render_current_image_calls += 1
+        return True
+
+    def render_next_image(self) -> bool:
+        self.render_next_image_calls += 1
+        return True
+
+    def render_previous_image(self) -> bool:
+        self.render_previous_image_calls += 1
+        return True
+
+    def cycle_mode_and_render(self) -> bool:
+        self.cycle_mode_and_render_calls += 1
+        return True
+
+    def get_last_rendered_image_path(self) -> str | None:
+        return self._last_rendered_image_path
+
+    def get_last_action(self) -> dict[str, str] | None:
+        return self._last_action
+
+    def pop_last_action(self) -> dict[str, str] | None:
+        action = self._last_action
+        self._last_action = None
+        return action
+
+    def is_render_in_progress(self) -> bool:
+        return self._render_in_progress
+
+    def set_last_action(self, action: dict[str, str] | None) -> None:
+        self._last_action = action
+
+    def set_render_in_progress(self, value: bool) -> None:
+        """Drive the busy-badge contract the UI polls for."""
+        self._render_in_progress = value
+
+    def set_last_rendered_image_path(self, path: str) -> None:
+        self._last_rendered_image_path = path
+
+
+@pytest.fixture
+def client(config, manager, tmp_path):
+    """Create a Flask test client for inky_image.web_app.create_web_app.
+
+    Sets INKY_IMAGE_BROWSE_ROOTS to a temporary directory so all path-
+    traversal and browse tests operate inside a known, safe sandbox.
+    """
+    import os
+
+    browse_root = tmp_path / "browse_root"
+    browse_root.mkdir()
+    os.environ["INKY_IMAGE_BROWSE_ROOTS"] = str(browse_root)
+
+    from inky_image.slideshow import SlideshowController
+    from inky_image.web_app import create_web_app
+
+    slideshow = SlideshowController(
+        interval_seconds_getter=lambda: 30, on_tick=lambda: None
+    )
+    renderer = RendererStub()
+    app = create_web_app(config, manager, slideshow, renderer)
+    app.config["TESTING"] = True
+
+    client = app.test_client()
+    # Reach the stub from tests via ``client.application.renderer_stub``.
+    app.renderer_stub = renderer
+    yield client
+
+    slideshow.shutdown()
+    os.environ.pop("INKY_IMAGE_BROWSE_ROOTS", None)

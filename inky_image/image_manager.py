@@ -309,6 +309,14 @@ class _UrlSource(_BaseSourceHandler):
 
     def _download_url_image(self, image_url: str) -> str | None:
         """Download *image_url* to cache and return local path, or None."""
+        # Guard here as well as in add_url_image(): refresh() feeds whatever is
+        # stored in the config straight into this method, so a hand-edited or
+        # legacy entry must never reach urlopen().
+        scheme = urlparse(str(image_url)).scheme.lower()
+        if scheme not in {"http", "https"}:
+            self._last_dl_error = "Only http/https URLs are supported."
+            return None
+
         request = Request(
             image_url,
             headers={

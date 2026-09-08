@@ -31,6 +31,39 @@ class TestDirtyFlag:
         assert manager._dirty is True
 
 
+class TestUrlDownloadGuard:
+    """_download_url_image is the choke point for every stored URL.
+
+    add_url_image() already rejects non-http schemes, but the config file is
+    editable by hand and refresh() feeds stored URLs straight into the
+    downloader, so the guard has to live there too.
+    """
+
+    def test_rejects_file_scheme_without_touching_the_network(
+        self, empty_manager, monkeypatch
+    ):
+        from inky_image import image_manager as im_module
+
+        opened = []
+        monkeypatch.setattr(im_module, "urlopen", lambda *a, **k: opened.append(a))
+
+        result = empty_manager._url_source._download_url_image("file:///etc/passwd")
+
+        assert result is None
+        assert opened == [], "urlopen must never be reached for a non-http scheme"
+        assert empty_manager._url_source._last_dl_error
+
+    def test_rejects_ftp_scheme(self, empty_manager, monkeypatch):
+        from inky_image import image_manager as im_module
+
+        opened = []
+        monkeypatch.setattr(im_module, "urlopen", lambda *a, **k: opened.append(a))
+
+        ftp = "ftp://host/img.jpg"
+        assert empty_manager._url_source._download_url_image(ftp) is None
+        assert opened == []
+
+
 class TestModeSwitching:
     """Switching between slideshow modes."""
 
