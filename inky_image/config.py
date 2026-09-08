@@ -8,7 +8,6 @@ import threading
 from pathlib import Path
 from typing import Any
 
-
 MODE_LIST_MAP: dict[str, str] = {
     "image_list": "selected_images",
     "url": "url_images",
@@ -168,12 +167,24 @@ class ConfigManager:
             self.save()
 
     def save(self) -> None:
-        """Persist config to disk."""
+        """Persist config to disk atomically.
+
+        Writes a sibling temp file, flushes it to the platter, then renames
+        it over the real path.  ``os.replace`` is atomic within a filesystem,
+        so a power cut leaves either the old config or the new one -- never a
+        truncated body that load() would discard.
+        """
         with self._lock:
-            self.config_path.write_text(
-                json.dumps(self._data, indent=2, ensure_ascii=True) + "\n",
-                encoding="utf-8",
-            )
+            payload = json.dumps(self._data, indent=2, ensure_ascii=True) + "\n"
+            tmp_path = self.config_path.with_name(self.config_path.name + ".tmp")
+            try:
+                with open(tmp_path, "w", encoding="utf-8") as handle:
+                    handle.write(payload)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(tmp_path, self.config_path)
+            finally:
+                tmp_path.unlink(missing_ok=True)
 
     def get(self, key: str, default: Any = None) -> Any:
         """Read a single config value."""

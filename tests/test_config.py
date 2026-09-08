@@ -228,3 +228,58 @@ class TestClearEmptyState:
         config.clear_uploaded_images()
         config.deactivate_active_directory()
         assert True  # reached without exception
+
+class TestAtomicSave:
+    """save() must never leave a truncated config at config_path.
+
+    The service runs on a Raspberry Pi that loses power by being unplugged.
+    A non-atomic write can land a partial JSON body at the real path, which
+    load() then throws away, wiping directories/lists/URLs.
+    """
+
+    def test_failed_write_preserves_previous_config(self, tmp_path, monkeypatch):
+        import os as os_module
+
+        cfg_path = tmp_path / "config.json"
+        photo_dir = tmp_path / "photos"
+        photo_dir.mkdir()
+
+        cfg = ConfigManager(str(cfg_path))
+        cfg.set("slideshow_interval", 42)
+        assert cfg.add_directory(str(photo_dir))
+        cfg.save()
+
+        # Simulate the write dying before the new content is in place.
+        def boom(*args, **kwargs):
+            raise OSError("disk gone")
+
+        with monkeypatch.context() as patch:
+            patch.setattr(os_module, "replace", boom)
+            with pytest.raises(OSError):
+                cfg.save()
+
+        # The file on disk must still be the good, complete, previous version.
+        untouched = ConfigManager(str(cfg_path))
+        assert untouched.get("slideshow_interval") == 42
+        assert untouched.get("directories") == [str(photo_dir.resolve())]
+
+    def test_no_temp_file_left_behind(self, tmp_path):
+        cfg_path = tmp_path / "config.json"
+        cfg = ConfigManager(str(cfg_path))
+        cfg.set("saturation", 0.9)
+        cfg.save()
+        strays = [p.name for p in tmp_path.iterdir() if p.name != "config.json"]
+        assert strays == []
+
+    def test_save_leaves_valid_json_for_large_config(self, tmp_path):
+        cfg_path = tmp_path / "config.json"
+        cfg = ConfigManager(str(cfg_path))
+        pool = tmp_path / "pool"
+        pool.mkdir()
+        for i in range(500):
+            shot = pool / f"img-{i:04d}.jpg"
+            shot.write_text("x")
+            assert cfg.add_selected_image(str(shot))
+
+        loaded = json.loads(cfg_path.read_text(encoding="utf-8"))
+        assert len(loaded["selected_images"]) == 500
