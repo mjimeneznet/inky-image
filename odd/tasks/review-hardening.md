@@ -45,6 +45,11 @@ server response instead of a hardcoded "Display is busy".
 S9 — `requirements-dev.txt` alone is enough to run the full suite (flask, waitress), and the
 renderer stub can report a non-ok outcome so the dropped-render contract is testable.
 
+S10 — Every behavior the review named as untested has at least one positive test: the upload
+happy path, `/api/current-image` serving a real rendered file, the remove-aftermath branch that
+stops the slideshow on an empty pool, a valid directory deactivate, `ButtonHandler.start()`
+with its GPIO setup, and `DisplayManager` image preparation (fit vs pad).
+
 ## Tasks
 
 | ID | Specs | Commit | Files |
@@ -57,6 +62,7 @@ renderer stub can report a non-ok outcome so the dropped-render contract is test
 | T6 | S7 | c72cca5 | inky_image/image_manager.py, tests |
 | T7 | S8 | 3727fb8 | static/js/main.js, static/js/feedback.js |
 | T8 | S9 | 20d13e8 | requirements-dev.txt, .github/workflows/ci.yml, tests/conftest.py |
+| T9 | S10 | pending | tests/ only |
 | - | S1 docs | 4eb21f8 | README.md |
 
 ## Log
