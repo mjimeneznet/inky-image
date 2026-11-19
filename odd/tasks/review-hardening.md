@@ -62,7 +62,7 @@ with its GPIO setup, and `DisplayManager` image preparation (fit vs pad).
 | T6 | S7 | c72cca5 | inky_image/image_manager.py, tests |
 | T7 | S8 | 3727fb8 | static/js/main.js, static/js/feedback.js |
 | T8 | S9 | 20d13e8 | requirements-dev.txt, .github/workflows/ci.yml, tests/conftest.py |
-| T9 | S10 | 7b9e
+| T9 | S10 | bc7e9f6 | tests/test_review_hardening.py |
 | - | S1 docs | 4eb21f8 | README.md |
 
 ## Log
