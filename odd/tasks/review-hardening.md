@@ -62,7 +62,7 @@ with its GPIO setup, and `DisplayManager` image preparation (fit vs pad).
 | T6 | S7 | c72cca5 | inky_image/image_manager.py, tests |
 | T7 | S8 | 3727fb8 | static/js/main.js, static/js/feedback.js |
 | T8 | S9 | 20d13e8 | requirements-dev.txt, .github/workflows/ci.yml, tests/conftest.py |
-| T9 | S10 | pending | tests/ only |
+| T9 | S10 | 7b9e
 | - | S1 docs | 4eb21f8 | README.md |
 
 ## Log
@@ -93,3 +93,8 @@ L5: Removed the duplicate `test_slideshow_toggle_calls_status` (strict subset of
 L6: Not fixed, stated honestly — an e-ink refresh cannot be aborted, so S5 makes
 shutdown wait for it instead of cancelling it; and `RendererStub` now reports an
 outcome, which is what makes S3 testable.
+
+L7: T9 landed as one characterization suite, `tests/test_review_hardening.py`
+(six tests, all green on first run — no RED expected, they pin shipped
+behavior). Suite total: 133 passed. It closed the last test gaps the review
+named.
