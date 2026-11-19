@@ -1,5 +1,8 @@
 # Development-only tools. The Raspberry Pi installs requirements.txt alone.
-# The test suite mocks PIL/inky/gpiod/gpiodevice (see tests/conftest.py), so
-# these two packages are all that is needed to run tests and lint anywhere.
+# The test suite mocks the display and GPIO packages (pillow, gpiod,
+# gpiodevice, inky) via tests/conftest.py; the web suite needs flask and
+# waitress, and the entry point imports waitress.
 pytest
 ruff
+flask
+waitress
