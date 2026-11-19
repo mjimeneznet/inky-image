@@ -128,3 +128,66 @@ class TestUploadSource:
         result = handler.refresh()
         assert len(result.images) == 1
         assert result.images[0].endswith("uploaded.png")
+
+
+class TestUrlRefreshNeverDownloads:
+    """refresh() runs under the manager lock, so it must stay cache-only."""
+
+    class FakeResponse:
+        headers = {"Content-Type": "image/jpeg"}
+
+        def read(self, _size=None):
+            return b"fake-image-bytes"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_exc):
+            return False
+
+    @staticmethod
+    def _source(config, tmp_path):
+        from inky_image.image_manager import _UrlSource
+
+        source = _UrlSource(config)
+        source._cache_dir = tmp_path / "url-cache"
+        source._cache_dir.mkdir()
+        return source
+
+    def test_refresh_reads_only_the_cache(self, config, tmp_path, monkeypatch):
+        from inky_image import image_manager as im_module
+
+        config.set("url_images", ["https://example.test/a.jpg"])
+        source = self._source(config, tmp_path)
+
+        reached: list[str] = []
+
+        def record(*_args, **_kwargs):
+            reached.append("urlopen")
+            raise OSError("offline")
+
+        monkeypatch.setattr(im_module, "urlopen", record)
+
+        result = source.refresh()
+
+        assert reached == [], "refresh() must not download under the lock"
+        assert result.images == []
+        assert result.error == "No valid URL images could be downloaded."
+
+    def test_prefetch_downloads_a_missing_url(self, config, tmp_path, monkeypatch):
+        from inky_image import image_manager as im_module
+
+        config.set("url_images", ["https://example.test/b.jpg"])
+        source = self._source(config, tmp_path)
+        calls: list[str] = []
+
+        def fake_urlopen(request, **_kwargs):
+            calls.append(str(request.full_url))
+            return self.FakeResponse()
+
+        monkeypatch.setattr(im_module, "urlopen", fake_urlopen)
+
+        source.prefetch_missing()
+
+        assert calls == ["https://example.test/b.jpg"]
+        assert len(source.refresh().images) == 1

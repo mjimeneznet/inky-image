@@ -230,6 +230,8 @@ class _UrlSource(_BaseSourceHandler):
         self._cache_dir = Path.home() / ".cache" / "inky-image" / "url-images"
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         self._last_dl_error: str | None = None
+        # Serialises downloads; taken without any manager or render lock held.
+        self._download_lock = threading.Lock()
 
     def mode_name(self) -> str:
         return "url"
@@ -238,29 +240,49 @@ class _UrlSource(_BaseSourceHandler):
         return list(self.config.get("url_images", []))
 
     def refresh(self) -> _RefreshResult:
+        """Resolve configured URLs to already cached files.
+
+        Never downloads: this runs under ImageManager._lock (and therefore on
+        the render path too), so network I/O here would stall every API call
+        and /api/status for the socket timeout of each URL.
+        """
         sources = self.list_sources()
         if not sources:
             return _RefreshResult([], [], None)
 
         resolved_paths: list[str] = []
-        last_error: str | None = None
         for image_url in sources:
             cached_path = self._cached_path_for_url(image_url)
-            if not cached_path:
-                cached_path = self._download_url_image(image_url)
-                if cached_path is None:
-                    last_error = self._last_dl_error
-                    self._last_dl_error = None
-                    continue
-            resolved_paths.append(cached_path)
+            if cached_path:
+                resolved_paths.append(cached_path)
+
+        error = self._last_dl_error
+        self._last_dl_error = None
 
         if not resolved_paths:
             return _RefreshResult(
                 [], [], "No valid URL images could be downloaded."
             )
 
-        # Catalog is the raw URL list — used to detect URL list changes.
-        return _RefreshResult(resolved_paths, list(sources), last_error)
+        # Catalog is the raw URL list - used to detect URL list changes.
+        return _RefreshResult(resolved_paths, list(sources), error)
+
+    def prefetch_missing(self) -> None:
+        """Download configured URLs that have no cached file yet.
+
+        Call this before taking a lock. Concurrent callers skip instead of
+        queueing behind another download, so a poll never waits on the network.
+        """
+        for image_url in self.list_sources():
+            if self._cached_path_for_url(image_url):
+                continue
+            if not self._download_lock.acquire(blocking=False):
+                return
+            try:
+                if not self._cached_path_for_url(image_url):
+                    self._download_url_image(image_url)
+            finally:
+                self._download_lock.release()
 
     # --- URL cache helpers -----------------------------------------------
 
@@ -467,6 +489,15 @@ class ImageManager:
         return mapping.get(mode)
 
     # --- Refresh ---------------------------------------------------------
+
+    def _ensure_url_cache(self) -> None:
+        """Download missing URL images before this manager's lock is taken.
+
+        Only the render paths call this: a browser poll must stay a pure read so
+        /api/status never waits on the network.
+        """
+        if self.get_mode() == "url" and (self._dirty or not self._images):
+            self._url_source.prefetch_missing()
 
     def refresh_images(self) -> list[str]:
         """Rebuild active image file list."""
@@ -682,25 +713,35 @@ class ImageManager:
     # --- URL image operations --------------------------------------------
 
     def add_url_image(self, image_url: str) -> bool:
-        """Add URL image source without duplicates."""
+        """Add URL image source without duplicates.
+
+        The download runs before the manager lock is taken: urlopen can block
+        for the socket timeout and every other request needs this lock.
+        """
+        normalized = str(image_url).strip()
+        parsed = urlparse(normalized)
+        if parsed.scheme not in {"http", "https"}:
+            with self._lock:
+                self._last_scan_error = "Only http/https URLs are supported."
+            return False
+        if not parsed.netloc:
+            with self._lock:
+                self._last_scan_error = "URL host is missing."
+            return False
+
+        cached_path = self._url_source._cached_path_for_url(normalized)
+        if not cached_path:
+            with self._url_source._download_lock:
+                cached_path = self._url_source._cached_path_for_url(
+                    normalized
+                ) or self._url_source._download_url_image(normalized)
+        download_error = None if cached_path else self._url_source._last_dl_error
+
         with self._lock:
             self._last_scan_error = None
-            normalized = str(image_url).strip()
-            parsed = urlparse(normalized)
-            if parsed.scheme not in {"http", "https"}:
-                self._last_scan_error = "Only http/https URLs are supported."
-                return False
-            if not parsed.netloc:
-                self._last_scan_error = "URL host is missing."
-                return False
-
-            cached_path = self._url_source._cached_path_for_url(normalized)
             if not cached_path:
-                cached_path = self._url_source._download_url_image(normalized)
-            if not cached_path:
-                self._last_scan_error = self._url_source._last_dl_error
+                self._last_scan_error = download_error
                 return False
-
             ok = self.config.add_url_image(normalized)
             if not ok:
                 self._last_scan_error = "URL already added."
@@ -859,6 +900,7 @@ class ImageManager:
 
     def current_image_path(self) -> str | None:
         """Return current image file path."""
+        self._ensure_url_cache()
         with self._lock:
             if not self._images:
                 self.refresh_images()
@@ -866,6 +908,7 @@ class ImageManager:
 
     def next_image_path(self) -> str | None:
         """Move to next image and return path."""
+        self._ensure_url_cache()
         with self._lock:
             if not self._images:
                 self.refresh_images()
@@ -881,6 +924,7 @@ class ImageManager:
 
     def previous_image_path(self) -> str | None:
         """Move to previous image and return path."""
+        self._ensure_url_cache()
         with self._lock:
             if not self._images:
                 self.refresh_images()

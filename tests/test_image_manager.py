@@ -94,3 +94,76 @@ class TestZeroDivisionGuard:
 
         result = ImageManager._normalized_current_image_index(manager, 0, False)
         assert result == 0
+
+
+class TestUrlDownloadDoesNotHoldTheManagerLock:
+    """urlopen can block for the socket timeout; it must never run under the lock.
+
+    Every route and the browser poll go through the manager lock, so a download
+    taken under it freezes /api/status for as many seconds as there are URLs.
+    """
+
+    @staticmethod
+    def _block_downloads(monkeypatch):
+        import threading
+
+        from inky_image import image_manager as im_module
+
+        entered = threading.Event()
+        release = threading.Event()
+
+        def blocking_urlopen(*_args, **_kwargs):
+            entered.set()
+            release.wait(5)
+            raise OSError("offline")
+
+        monkeypatch.setattr(im_module, "urlopen", blocking_urlopen)
+        return entered, release
+
+    def test_status_is_not_stalled_by_a_slow_download(
+        self, empty_manager, config, monkeypatch
+    ):
+        import time
+
+        config.set("url_images", ["https://example.test/slow.jpg"])
+        config.set("slideshow_mode", "url")
+        empty_manager._dirty = True
+        entered, release = self._block_downloads(monkeypatch)
+
+        import threading
+
+        worker = threading.Thread(
+            target=empty_manager.current_image_path, daemon=True
+        )
+        worker.start()
+        assert entered.wait(5)
+        try:
+            started = time.monotonic()
+            empty_manager.get_status()
+            assert time.monotonic() - started < 1.0
+        finally:
+            release.set()
+            worker.join(5)
+
+    def test_add_url_image_is_not_stalled_by_its_own_download(
+        self, empty_manager, monkeypatch
+    ):
+        import threading
+        import time
+
+        entered, release = self._block_downloads(monkeypatch)
+
+        worker = threading.Thread(
+            target=empty_manager.add_url_image,
+            args=("https://example.test/pic.jpg",),
+            daemon=True,
+        )
+        worker.start()
+        assert entered.wait(5)
+        try:
+            started = time.monotonic()
+            empty_manager.get_status()
+            assert time.monotonic() - started < 1.0
+        finally:
+            release.set()
+            worker.join(5)
