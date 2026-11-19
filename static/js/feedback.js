@@ -101,10 +101,13 @@ export function createFeedback({ formatModeLabel, contrastStorageKey }) {
 	}
 
 	function setUiButtonsDisabled(disabled) {
+		// The URL add button belongs to URL validation, not to this overlay: a
+		// blanket re-enable would let an empty or invalid URL be submitted.
+		const urlAddButton = document.getElementById("add-url-image-button");
+		const urlAddDisabled = urlAddButton ? urlAddButton.disabled : false;
 		const ids = [
 			"add-directory-button",
 			"clear-images-button",
-			"add-url-image-button",
 			"clear-url-images-button",
 			"add-upload-image-button",
 			"clear-upload-images-button",
@@ -126,6 +129,9 @@ export function createFeedback({ formatModeLabel, contrastStorageKey }) {
 			if (element) {
 				element.disabled = disabled;
 			}
+		}
+		if (urlAddButton) {
+			urlAddButton.disabled = disabled ? true : urlAddDisabled;
 		}
 		document
 			.querySelectorAll("#directories-list button, #selected-images-list button, #url-images-list button, #upload-images-list button")
