@@ -6,6 +6,7 @@ import logging
 import signal
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 from waitress import serve
@@ -62,9 +63,9 @@ class Application(Renderer):
 
     def render_current_image(self) -> bool:
         """Render current image on the e-ink display."""
-        if not self._acquire_render_lock():
-            return False
-        try:
+        with self._render_slot() as acquired:
+            if not acquired:
+                return False
             image_path = self.image_manager.current_image_path()
             if image_path:
                 return self._render_image_path_locked(image_path, "image")
@@ -75,8 +76,6 @@ class Application(Renderer):
                 logger.warning("No image available to display")
                 return False
             return self._render_no_image_placeholder_locked()
-        finally:
-            self._render_lock.release()
 
     def _render_no_image_placeholder_locked(self) -> bool:
         """Render placeholder when no directories are configured."""
@@ -86,32 +85,26 @@ class Application(Renderer):
                 self.no_image_path,
             )
             return False
-        self._render_in_progress = True
-        try:
-            return self._render_image_path_locked(
-                str(self.no_image_path), "no-image placeholder"
-            )
-        finally:
-            self._render_in_progress = False
+        return self._render_image_path_locked(
+            str(self.no_image_path), "no-image placeholder"
+        )
 
     def render_next_image(self) -> bool:
         """Advance image index and render."""
-        if not self._acquire_render_lock():
-            return False
-        try:
+        with self._render_slot() as acquired:
+            if not acquired:
+                return False
             image_path = self.image_manager.next_image_path()
             if not image_path:
                 logger.warning("No next image to display")
                 return False
             return self._render_image_path_locked(image_path, "next image", force=True)
-        finally:
-            self._render_lock.release()
 
     def render_previous_image(self) -> bool:
         """Go back image index and render."""
-        if not self._acquire_render_lock():
-            return False
-        try:
+        with self._render_slot() as acquired:
+            if not acquired:
+                return False
             image_path = self.image_manager.previous_image_path()
             if not image_path:
                 logger.warning("No previous image to display")
@@ -119,14 +112,12 @@ class Application(Renderer):
             return self._render_image_path_locked(
                 image_path, "previous image", force=True
             )
-        finally:
-            self._render_lock.release()
 
     def cycle_mode_and_render(self) -> bool:
         """Switch to next slideshow mode and render current image."""
-        if not self._acquire_render_lock():
-            return False
-        try:
+        with self._render_slot() as acquired:
+            if not acquired:
+                return False
             modes = ["directory", "image_list", "url", "upload"]
             current_mode = self.image_manager.get_mode()
             if current_mode in modes:
@@ -144,28 +135,37 @@ class Application(Renderer):
             if not image_path:
                 return self._render_no_image_placeholder_locked()
             return self._render_image_path_locked(image_path, f"{next_mode} mode image")
-        finally:
-            self._render_lock.release()
 
-    def _acquire_render_lock(self) -> bool:
-        """Acquire render lock without waiting; drop action if display is busy."""
-        acquired = self._render_lock.acquire(blocking=False)
-        if not acquired:
+    @contextmanager
+    def _render_slot(self):
+        """Own the display for one action.
+
+        Yields True when the render lock was taken and False when another
+        refresh owns the display and this action is dropped. The in-progress
+        flag spans the whole critical section, image refresh included, so the
+        busy badge never reports idle while the panel is being driven.
+        """
+        if not self._render_lock.acquire(blocking=False):
             logger.info("Display is busy refreshing, dropping action")
-        return acquired
+            yield False
+            return
+        self._render_in_progress = True
+        try:
+            yield True
+        finally:
+            self._render_in_progress = False
+            self._render_lock.release()
 
     def _render_image_path_locked(
         self, image_path: str, label: str, force: bool = False
     ) -> bool:
         """Render image while render lock is held."""
-        self._render_in_progress = True
         saturation = float(self.config.get("saturation", 0.5))
         scale_to_fit = bool(self.config.get("scale_to_fit", True))
         render_width = int(self.config.get("render_width", 800))
         render_height = int(self.config.get("render_height", 480))
         signature = (image_path, saturation, scale_to_fit, render_width, render_height)
         if not force and self._last_render_signature == signature:
-            self._render_in_progress = False
             logger.info("Skipping render for %s (same image and settings)", label)
             return True
 
@@ -184,8 +184,6 @@ class Application(Renderer):
         except Exception as exc:  # pragma: no cover - hardware path
             logger.exception("Failed to display %s %s: %s", label, image_path, exc)
             return False
-        finally:
-            self._render_in_progress = False
 
     def _setup_buttons(self) -> None:
         callbacks = {
