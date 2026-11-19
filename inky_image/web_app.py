@@ -582,7 +582,13 @@ def create_web_app(
     @app.post("/api/slideshow/reshuffle")
     def reshuffle_slideshow():
         if not image_manager.reshuffle():
-            return jsonify({"ok": False, "status": image_manager.get_status()})
+            return jsonify(
+                {
+                    "ok": False,
+                    "error": "No images available to reshuffle.",
+                    "status": image_manager.get_status(),
+                }
+            )
         return _render_response(image_manager, renderer.render_current_image())
 
     @app.get("/api/current-image")
