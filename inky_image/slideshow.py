@@ -23,10 +23,15 @@ class SlideshowController:
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._lock = threading.RLock()
+        # Set by shutdown(): a late web request must not restart the loop.
+        self._closed = False
 
     def start(self) -> None:
         """Start slideshow loop."""
         with self._lock:
+            if self._closed:
+                logger.info("Slideshow is shut down; ignoring start")
+                return
             self._running_event.set()
             if self._thread and self._thread.is_alive():
                 logger.info("Slideshow resumed")
@@ -45,23 +50,34 @@ class SlideshowController:
             logger.info("Slideshow stopped")
 
     def toggle(self) -> bool:
-        """Toggle slideshow state. Returns True when running."""
-        if self.is_running():
-            self.stop()
-            return False
-        self.start()
-        return True
+        """Toggle slideshow state atomically. Returns True when running.
+
+        The decision and the transition happen under one lock so a web request
+        and a physical button press cannot both observe the same state and lose
+        one of the two intentions.
+        """
+        with self._lock:
+            if self._closed:
+                return False
+            if self.is_running():
+                self.stop()
+                return False
+            self.start()
+            return True
 
     def is_running(self) -> bool:
         """Return True if slideshow is currently active."""
         return self._running_event.is_set()
 
     def shutdown(self) -> None:
-        """Fully terminate slideshow thread."""
-        self._running_event.clear()
-        self._stop_event.set()
-        if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=3.0)
+        """Fully terminate slideshow thread. Terminal: start() is refused after."""
+        with self._lock:
+            self._closed = True
+            self._running_event.clear()
+            self._stop_event.set()
+            thread = self._thread
+        if thread and thread.is_alive():
+            thread.join(timeout=3.0)
 
     def _loop(self) -> None:
         while not self._stop_event.is_set():
