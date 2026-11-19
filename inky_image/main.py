@@ -269,10 +269,18 @@ class Application(Renderer):
             raise RuntimeError("Web UI server startup failed")
 
     def stop(self) -> None:
-        """Stop background services cleanly."""
+        """Stop background services cleanly.
+
+        A refresh already writing to the panel cannot be cancelled, so wait for
+        it instead of exiting mid-write and leaving a partial image on screen.
+        """
         self.slideshow.shutdown()
         if self._button_handler:
             self._button_handler.stop()
+        if self._render_lock.acquire(timeout=30):
+            self._render_lock.release()
+        else:
+            logger.warning("Render still running after 30s; shutting down anyway")
         logger.info("Inky Image Viewer stopped")
 
     def is_render_in_progress(self) -> bool:

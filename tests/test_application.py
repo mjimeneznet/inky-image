@@ -123,3 +123,20 @@ def test_identical_render_is_skipped_but_reports_success(app):
 
     assert app.render_current_image() is True
     assert len(app.display.rendered) == 1
+
+
+def test_stop_waits_for_an_in_flight_refresh(app):
+    """stop() must not return while the panel is being written."""
+    render = threading.Thread(target=app.render_current_image, daemon=True)
+    render.start()
+    assert app.display.entered.wait(5), "the blocking display was never entered"
+
+    stopper = threading.Thread(target=app.stop, daemon=True)
+    stopper.start()
+    stopper.join(0.3)
+    assert stopper.is_alive(), "stop() returned while the panel was mid-refresh"
+
+    app.display.release.set()
+    render.join(5)
+    stopper.join(5)
+    assert stopper.is_alive() is False

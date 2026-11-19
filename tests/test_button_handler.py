@@ -113,3 +113,30 @@ class TestLockedCallbacks:
     def test_unregistered_button_is_ignored(self, handler):
         handler._handle_event(_event(BUTTONS[0]))
         assert handler._executor._work_queue.empty()
+
+
+def test_stop_waits_for_a_running_action():
+    """A queued button action mid-render must finish before stop() returns."""
+    import threading
+
+    from inky_image.button_handler import ButtonHandler
+
+    entered = threading.Event()
+    release = threading.Event()
+
+    def action():
+        entered.set()
+        release.wait(5)
+
+    handler = ButtonHandler(callbacks={"A": action})
+    handler._executor.submit(action)
+    assert entered.wait(5)
+
+    stopper = threading.Thread(target=handler.stop, daemon=True)
+    stopper.start()
+    stopper.join(0.3)
+    assert stopper.is_alive(), "stop() returned while a button action was running"
+
+    release.set()
+    stopper.join(5)
+    assert stopper.is_alive() is False
