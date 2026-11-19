@@ -56,10 +56,15 @@ sudo ./install.sh
 The installer will:
 
 - Install system dependencies
-- Copy files to `/home/<user>/inky-image`
-- Create a virtual environment
-- Install Python dependencies
+- Create the virtual environment and install Python dependencies
+- Copy files to `/home/<user>/inky-image` (skipped when the checkout already is
+  that directory)
 - Install and start `inky-image.service`
+
+`--target-dir` must be absolute and either empty or an existing inky-image
+install. The installer refuses system directories, the target user's home and
+any ancestor of the checkout, because the sync step deletes everything under
+the target that is not part of this project.
 
 ## Updating
 
