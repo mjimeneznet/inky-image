@@ -68,3 +68,7 @@ resurrectable slideshow; shutdown killing an in-flight panel refresh; the render
 window; the status poll clobbering the settings form; sed without escaping plus no rollback
 in the deploy scripts; unit-file crash loop; feedback.js re-enabling the URL button; and test
 gaps (main/slideshow/renderer/display untested, RendererStub always True, CI missing flask).
+
+L3: Slice boundary — commits 1-3 (12ac5e2 deploy safety, 9cdcd21 render flag,
+and the render-outcome commit) are review slice 1 (~400 authored lines).
+Further commits form slice 2. Push/PR shape is the user's decision.

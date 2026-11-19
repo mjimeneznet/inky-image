@@ -91,6 +91,7 @@ def test_dropped_render_while_busy_leaves_flag_low(app):
     try:
         assert app.render_current_image() is False
         assert app.is_render_in_progress() is False
+        assert app.last_render_outcome() == "busy"
     finally:
         release.set()
         holder.join(5)
@@ -102,6 +103,17 @@ def test_render_flag_is_cleared_after_a_failed_refresh(app, monkeypatch):
 
     assert app.render_current_image() is False
     assert app.is_render_in_progress() is False
+    assert app.last_render_outcome() == "failed"
+
+
+def test_render_reports_an_empty_source(app, tmp_path):
+    """Nothing to show is its own outcome, not a display failure."""
+    for image in (tmp_path / "images").iterdir():
+        image.unlink()
+    app.image_manager.set_active_directory(0)
+
+    assert app.render_current_image() is False
+    assert app.last_render_outcome() == "empty"
 
 
 def test_identical_render_is_skipped_but_reports_success(app):

@@ -547,3 +547,59 @@ class TestMethodRouting:
         """DELETE /api/slideshow/toggle must not be allowed."""
         resp = client.delete("/api/slideshow/toggle")
         assert resp.status_code == 405
+
+
+class TestRenderOutcomeIsReported:
+    """A route must not answer ok:True when the panel did not take the image.
+
+    ``RendererStub`` reports the outcome the real renderer sets per render, so
+    these tests pin the contract the UI relies on to stop claiming "activated"
+    while the display still shows the previous image.
+    """
+
+    def test_activate_reports_a_busy_display(self, client):
+        client.application.renderer_stub.set_render_outcome("busy")
+
+        data = client.post("/api/directories/0/activate").get_json()
+
+        assert data["ok"] is False
+        assert data["error"] == "Display is busy refreshing; try again."
+
+    def test_activate_reports_a_failed_refresh(self, client):
+        client.application.renderer_stub.set_render_outcome("failed")
+
+        data = client.post("/api/directories/0/activate").get_json()
+
+        assert data["ok"] is False
+        assert data["error"] == "Display refresh failed."
+
+    def test_activate_reports_an_empty_source(self, client):
+        client.application.renderer_stub.set_render_outcome("empty")
+
+        data = client.post("/api/directories/0/activate").get_json()
+
+        assert data["ok"] is False
+        assert data["error"] == "No image available to display."
+
+    def test_next_image_reports_the_server_message(self, client):
+        client.application.renderer_stub.set_render_outcome("busy")
+
+        data = client.post("/api/slideshow/next").get_json()
+
+        assert data["ok"] is False
+        assert data["error"] == "Display is busy refreshing; try again."
+
+    def test_successful_activate_still_reports_ok(self, client):
+        data = client.post("/api/directories/0/activate").get_json()
+
+        assert data["ok"] is True
+        assert "error" not in data
+
+    def test_settings_report_a_failed_render_without_failing_the_save(self, client):
+        client.application.renderer_stub.set_render_outcome("failed")
+
+        data = client.post("/api/settings", json={"saturation": 0.8}).get_json()
+
+        assert data["ok"] is True
+        assert data["settings"]["saturation"] == 0.8
+        assert data["render_error"] == "Display refresh failed."

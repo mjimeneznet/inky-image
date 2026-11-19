@@ -55,6 +55,29 @@ def create_web_app(
     browse_roots = _browse_roots_from_env()
     default_browse_root = browse_roots[0] if browse_roots else Path.home().resolve()
 
+    # Why a render did not reach the panel; the UI shows these verbatim.
+    render_errors = {
+        "busy": "Display is busy refreshing; try again.",
+        "failed": "Display refresh failed.",
+        "empty": "No image available to display.",
+    }
+
+    def _render_error() -> str | None:
+        """Message for the last render outcome on this request thread."""
+        return render_errors.get(renderer.last_render_outcome())
+
+    def _render_response(manager: ImageManager, rendered: bool):
+        """Standard JSON response, honest about a render the panel never took."""
+        if rendered:
+            return jsonify({"ok": True, "status": manager.get_status()})
+        return jsonify(
+            {
+                "ok": False,
+                "error": _render_error() or "Display refresh failed.",
+                "status": manager.get_status(),
+            }
+        )
+
     app = Flask(
         __name__,
         template_folder=str(Path(__file__).resolve().parent.parent / "templates"),
@@ -80,8 +103,7 @@ def create_web_app(
         """Activate an item, re-render and return the standard JSON response."""
         if not activate_fn(index):
             return jsonify({"ok": False, "error": error_msg}), 400
-        renderer.render_current_image()
-        return jsonify({"ok": True, "status": manager.get_status()})
+        return _render_response(manager, renderer.render_current_image())
 
     def _handle_deactivate(
         manager: ImageManager,
@@ -94,8 +116,7 @@ def create_web_app(
             return jsonify({"ok": False, "error": error_msg}), 400
         slideshow.stop()
         config.set("slideshow_running", False)
-        renderer.render_current_image()
-        return jsonify({"ok": True, "status": manager.get_status()})
+        return _render_response(manager, renderer.render_current_image())
 
     @app.get("/")
     def index():
@@ -309,8 +330,7 @@ def create_web_app(
         ok = image_manager.set_mode(mode)
         if not ok:
             return jsonify({"ok": False, "error": "Failed to set mode"}), 400
-        renderer.render_current_image()
-        return jsonify({"ok": True, "status": image_manager.get_status()})
+        return _render_response(image_manager, renderer.render_current_image())
 
     @app.post("/api/images")
     def add_image():
@@ -418,7 +438,9 @@ def create_web_app(
                 {"ok": False, "error": "Uploaded file is invalid or could not be saved"}
             ), 400
         if image_manager.get_mode() == "upload":
-            renderer.render_current_image()
+            return _render_response(
+                image_manager, renderer.render_current_image()
+            )
         return jsonify({"ok": True, "status": image_manager.get_status()})
 
     @app.delete("/api/upload-images/<int:index>")
@@ -470,13 +492,11 @@ def create_web_app(
 
     @app.post("/api/slideshow/next")
     def next_image():
-        ok = renderer.render_next_image()
-        return jsonify({"ok": ok, "status": image_manager.get_status()})
+        return _render_response(image_manager, renderer.render_next_image())
 
     @app.post("/api/slideshow/prev")
     def previous_image():
-        ok = renderer.render_previous_image()
-        return jsonify({"ok": ok, "status": image_manager.get_status()})
+        return _render_response(image_manager, renderer.render_previous_image())
 
     @app.post("/api/settings")
     def update_settings():
@@ -522,6 +542,7 @@ def create_web_app(
             except (ValueError, TypeError):
                 return jsonify({"ok": False, "error": "Invalid render_height"}), 400
 
+        render_error = None
         if updates:
             config.update(updates)
             if (
@@ -530,33 +551,39 @@ def create_web_app(
                 or "render_width" in updates
                 or "render_height" in updates
             ):
-                renderer.render_current_image()
+                # The settings are saved either way; report a stale panel
+                # separately instead of failing the save.
+                if not renderer.render_current_image():
+                    render_error = _render_error() or "Display refresh failed."
 
-        return jsonify(
-            {
-                "ok": True,
-                "status": image_manager.get_status(),
-                "settings": config.get_all(),
-            }
-        )
+        payload = {
+            "ok": True,
+            "status": image_manager.get_status(),
+            "settings": config.get_all(),
+        }
+        if render_error:
+            payload["render_error"] = render_error
+        return jsonify(payload)
 
     @app.post("/api/folder/cycle")
     def cycle_folder():
         ok = renderer.cycle_mode_and_render()
-        return jsonify(
-            {
-                "ok": ok,
-                "status": image_manager.get_status(),
-                "mode": image_manager.get_mode(),
-            }
-        )
+        payload = {
+            "status": image_manager.get_status(),
+            "mode": image_manager.get_mode(),
+        }
+        if ok:
+            payload["ok"] = True
+        else:
+            payload["ok"] = False
+            payload["error"] = _render_error() or "Display refresh failed."
+        return jsonify(payload)
 
     @app.post("/api/slideshow/reshuffle")
     def reshuffle_slideshow():
-        ok = image_manager.reshuffle()
-        if ok:
-            renderer.render_current_image()
-        return jsonify({"ok": ok, "status": image_manager.get_status()})
+        if not image_manager.reshuffle():
+            return jsonify({"ok": False, "status": image_manager.get_status()})
+        return _render_response(image_manager, renderer.render_current_image())
 
     @app.get("/api/current-image")
     def current_image():

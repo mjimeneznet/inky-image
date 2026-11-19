@@ -46,6 +46,9 @@ class Application(Renderer):
         self._last_action: dict[str, str] | None = None
         self._action_lock = threading.RLock()
         self._render_in_progress = False
+        # Per-thread so a route answers with the outcome of its own render even
+        # while another thread drives the display.
+        self._render_outcome = threading.local()
 
         self.slideshow = SlideshowController(
             interval_seconds_getter=lambda: int(
@@ -74,6 +77,7 @@ class Application(Renderer):
                 if self.image_manager.get_active_directory() is None:
                     return self._render_no_image_placeholder_locked()
                 logger.warning("No image available to display")
+                self._set_render_outcome("empty")
                 return False
             return self._render_no_image_placeholder_locked()
 
@@ -84,6 +88,7 @@ class Application(Renderer):
                 "No directories configured and placeholder missing: %s",
                 self.no_image_path,
             )
+            self._set_render_outcome("empty")
             return False
         return self._render_image_path_locked(
             str(self.no_image_path), "no-image placeholder"
@@ -97,6 +102,7 @@ class Application(Renderer):
             image_path = self.image_manager.next_image_path()
             if not image_path:
                 logger.warning("No next image to display")
+                self._set_render_outcome("empty")
                 return False
             return self._render_image_path_locked(image_path, "next image", force=True)
 
@@ -108,6 +114,7 @@ class Application(Renderer):
             image_path = self.image_manager.previous_image_path()
             if not image_path:
                 logger.warning("No previous image to display")
+                self._set_render_outcome("empty")
                 return False
             return self._render_image_path_locked(
                 image_path, "previous image", force=True
@@ -127,6 +134,7 @@ class Application(Renderer):
             ok = self.image_manager.set_mode(next_mode)
             if not ok:
                 logger.warning("Failed to cycle slideshow mode from %s", current_mode)
+                self._set_render_outcome("failed")
                 return False
             logger.info(
                 "Switched slideshow mode from %s to %s", current_mode, next_mode
@@ -147,14 +155,24 @@ class Application(Renderer):
         """
         if not self._render_lock.acquire(blocking=False):
             logger.info("Display is busy refreshing, dropping action")
+            self._set_render_outcome("busy")
             yield False
             return
         self._render_in_progress = True
+        self._set_render_outcome("ok")
         try:
             yield True
         finally:
             self._render_in_progress = False
             self._render_lock.release()
+
+    def _set_render_outcome(self, outcome: str) -> None:
+        """Record this thread's render outcome for the caller to report."""
+        self._render_outcome.value = outcome
+
+    def last_render_outcome(self) -> str:
+        """Return how the last render on this thread ended."""
+        return getattr(self._render_outcome, "value", "ok")
 
     def _render_image_path_locked(
         self, image_path: str, label: str, force: bool = False
@@ -183,6 +201,7 @@ class Application(Renderer):
             return True
         except Exception as exc:  # pragma: no cover - hardware path
             logger.exception("Failed to display %s %s: %s", label, image_path, exc)
+            self._set_render_outcome("failed")
             return False
 
     def _setup_buttons(self) -> None:
