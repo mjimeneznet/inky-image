@@ -403,14 +403,6 @@ class TestSlideshowRoutes:
         assert data["ok"] is True
         assert "slideshow_running" in data
 
-    def test_slideshow_toggle_calls_status(self, client):
-        """POST /api/slideshow/toggle returns ok=True always."""
-        resp = client.post("/api/slideshow/toggle")
-        assert resp.status_code == 200
-        data = resp.get_json(silent=True)
-        assert data is not None
-        assert data["ok"] is True
-
     def test_slideshow_next(self, client):
         """POST /api/slideshow/next returns ok and status."""
         resp = client.post("/api/slideshow/next")

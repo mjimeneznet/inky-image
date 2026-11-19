@@ -47,16 +47,17 @@ renderer stub can report a non-ok outcome so the dropped-render contract is test
 
 ## Tasks
 
-| ID | Specs | Route | Files | Commit |
-| --- | --- | --- | --- | --- |
-| T1 | S1-S2 | inline | install.sh, update.sh, inky-image.service | 1 |
-| T2 | S6 | inline | inky_image/main.py, tests/test_application.py | 2 |
-| T3 | S3 | inline | inky_image/main.py, renderer.py, web_app.py, tests | 3 |
-| T4 | S4 | inline | inky_image/slideshow.py, tests/test_slideshow.py | 4 |
-| T5 | S5 | inline | inky_image/main.py, button_handler.py, tests | 5 |
-| T6 | S7 | inline | inky_image/image_manager.py, tests | 6 |
-| T7 | S8 | inline | static/js/main.js, static/js/feedback.js | 7 |
-| T8 | S9 | inline | requirements-dev.txt, tests/conftest.py, .github/workflows/ci.yml | 8 |
+| ID | Specs | Commit | Files |
+| --- | --- | --- | --- |
+| T1 | S1-S2 | 12ac5e2 | install.sh, update.sh, inky-image.service |
+| T2 | S6 | 9cdcd21 | inky_image/main.py, tests/test_application.py |
+| T3 | S3 | 1e84b8b, c89773d | main.py, renderer.py, web_app.py, tests |
+| T4 | S4 | 83b8d03 | inky_image/slideshow.py, tests/test_slideshow.py |
+| T5 | S5 | f72d4de | main.py, button_handler.py, tests |
+| T6 | S7 | c72cca5 | inky_image/image_manager.py, tests |
+| T7 | S8 | 3727fb8 | static/js/main.js, static/js/feedback.js |
+| T8 | S9 | 20d13e8 | requirements-dev.txt, .github/workflows/ci.yml, tests/conftest.py |
+| - | S1 docs | 4eb21f8 | README.md |
 
 ## Log
 
@@ -72,3 +73,17 @@ gaps (main/slideshow/renderer/display untested, RendererStub always True, CI mis
 L3: Slice boundary — commits 1-3 (12ac5e2 deploy safety, 9cdcd21 render flag,
 and the render-outcome commit) are review slice 1 (~400 authored lines).
 Further commits form slice 2. Push/PR shape is the user's decision.
+
+L4: Verification — `.venv/bin/python -m pytest` (128 passed before the duplicate
+test was removed, 127 after), `ruff check .` clean after every commit. The two
+URL lock tests were proved RED against HEAD's image_manager.py before landing
+(differential run with `git show HEAD:...`). Shell changes verified with
+`bash -n` plus the guard and sed_escape function text extracted from install.sh
+and exercised with hostile paths. JS verified with `node --check` and a
+syncField self-check run against the shipped function text. No JS/shell test is
+committed: the repo has no JS or shell harness and adding one was out of scope.
+L5: Removed the duplicate `test_slideshow_toggle_calls_status` (strict subset of
+`test_slideshow_toggle`), per the review's test-gap finding.
+L6: Not fixed, stated honestly — an e-ink refresh cannot be aborted, so S5 makes
+shutdown wait for it instead of cancelling it; and `RendererStub` now reports an
+outcome, which is what makes S3 testable.
