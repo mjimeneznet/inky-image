@@ -1,6 +1,11 @@
 [Unit]
 Description=Inky Image Viewer
-After=multi-user.target
+Wants=network-online.target
+After=network-online.target
+# A permanent startup failure (for example port 80 already taken) must surface as
+# a failed unit instead of an endless 10 second restart loop.
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
