@@ -59,7 +59,9 @@ class ButtonHandler:
         self._stop_event.set()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=2.0)
-        self._executor.shutdown(wait=False, cancel_futures=True)
+        # Wait for the in-flight action: an e-ink refresh cannot be cancelled,
+        # so exiting mid-write would leave a garbled image on the panel.
+        self._executor.shutdown(wait=True, cancel_futures=True)
         if self._request is not None:
             try:
                 self._request.release()

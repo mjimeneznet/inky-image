@@ -10,6 +10,41 @@ printUsage() {
 	echo "  sudo ./update.sh --user pi --target-dir /home/pi/inky-image"
 }
 
+# Inside a sed replacement, \ & and the | delimiter must be escaped or a path
+# containing one of them silently corrupts the rendered unit file.
+sed_escape() {
+	printf '%s' "$1" | sed -e 's/[\\|&]/\\&/g'
+}
+
+fail() {
+	echo "$1" >&2
+	exit 1
+}
+
+# Refuse anything rsync --delete could ruin: system directories, the target
+# user's home itself, an ancestor of the checkout, or a non-empty directory
+# that is not already an inky-image install.
+validate_target_dir() {
+	case "${TARGET_DIR}" in
+		/|/home|/root|/usr|/usr/local|/etc|/var|/opt|/srv|/bin|/boot|/lib|/tmp)
+			fail "Refusing to install into unsafe target directory: ${TARGET_DIR}"
+			;;
+	esac
+	if [[ "${TARGET_DIR}" == "${TARGET_HOME}" ]]; then
+		fail "Refusing to install into unsafe target directory: ${TARGET_DIR}"
+	fi
+	if [[ "${TARGET_DIR}" != "${SOURCE_DIR}" && "${SOURCE_DIR}/" == "${TARGET_DIR}/"* ]]; then
+		fail "Refusing to install into unsafe target directory: ${TARGET_DIR}"
+	fi
+	if [[ -e "${TARGET_DIR}" && ! -d "${TARGET_DIR}" ]]; then
+		fail "Refusing to install into unsafe target directory: ${TARGET_DIR}"
+	fi
+	if [[ -d "${TARGET_DIR}" && -n "$(ls -A "${TARGET_DIR}" 2>/dev/null)" \
+		&& ! -e "${TARGET_DIR}/inky_image/main.py" ]]; then
+		fail "Refusing to overwrite a directory that is not an inky-image install: ${TARGET_DIR}"
+	fi
+}
+
 SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_USER="${TARGET_USER:-${SUDO_USER:-}}"
 TARGET_DIR=""
@@ -69,6 +104,15 @@ if [[ "${TARGET_DIR:0:1}" != "/" ]]; then
 	echo "--target-dir must be an absolute path." >&2
 	exit 1
 fi
+TARGET_DIR="${TARGET_DIR%/}"
+if [[ -z "${TARGET_DIR}" ]]; then
+	echo "--target-dir must be an absolute path." >&2
+	exit 1
+fi
+validate_target_dir
+
+trap 'echo "Update failed. The running service may not match the code on disk; re-run ./update.sh once the error above is fixed." >&2' ERR
+
 if [[ ! -d "${SOURCE_DIR}/.git" ]]; then
 	echo "Updater must be run from a git checkout: ${SOURCE_DIR}" >&2
 	exit 1
@@ -106,8 +150,18 @@ else
 	changed_files="$(sudo -u "${TARGET_USER}" git -C "${SOURCE_DIR}" diff --name-only "${before_revision}" "${after_revision}")"
 fi
 
+# Dependencies install before the target tree is replaced so a failed pip
+# install cannot leave new code on disk next to the dependencies the running
+# process already loaded.
+echo "[3/5] Updating Python dependencies if needed..."
+if [[ "${changed_files}" == *"requirements.txt"* ]]; then
+	sudo -u "${TARGET_USER}" "${VENV_DIR}/bin/pip" install -r "${SOURCE_DIR}/requirements.txt"
+else
+	echo "requirements.txt unchanged."
+fi
+
+echo "[4/5] Syncing project files if needed..."
 if [[ "${SOURCE_DIR}" != "${TARGET_DIR}" ]]; then
-	echo "Syncing project files to ${TARGET_DIR}..."
 	mkdir -p "${TARGET_DIR}"
 	rsync -a --delete \
 		--exclude ".git/" \
@@ -119,27 +173,21 @@ if [[ "${SOURCE_DIR}" != "${TARGET_DIR}" ]]; then
 		--exclude ".venv/" \
 		"${SOURCE_DIR}/" "${TARGET_DIR}/"
 	chown -R "${TARGET_USER}:${TARGET_USER}" "${TARGET_DIR}"
-fi
-
-echo "[3/5] Updating Python dependencies if needed..."
-if [[ "${changed_files}" == *"requirements.txt"* ]]; then
-	sudo -u "${TARGET_USER}" "${VENV_DIR}/bin/pip" install -r "${TARGET_DIR}/requirements.txt"
 else
-	echo "requirements.txt unchanged."
+	echo "Checkout is the target directory; nothing to sync."
 fi
 
-echo "[4/5] Updating systemd unit if needed..."
+echo "[5/5] Updating systemd unit if needed and restarting service..."
 if [[ "${changed_files}" == *"inky-image.service"* || ! -e "${SERVICE_PATH}" ]]; then
 	cp "${SERVICE_TEMPLATE}" "${SERVICE_PATH}"
-	sed -i "s|__INKY_USER__|${TARGET_USER}|g" "${SERVICE_PATH}"
-	sed -i "s|__INKY_HOME__|${TARGET_HOME}|g" "${SERVICE_PATH}"
-	sed -i "s|__INKY_TARGET_DIR__|${TARGET_DIR}|g" "${SERVICE_PATH}"
+	sed -i "s|__INKY_USER__|$(sed_escape "${TARGET_USER}")|g" "${SERVICE_PATH}"
+	sed -i "s|__INKY_HOME__|$(sed_escape "${TARGET_HOME}")|g" "${SERVICE_PATH}"
+	sed -i "s|__INKY_TARGET_DIR__|$(sed_escape "${TARGET_DIR}")|g" "${SERVICE_PATH}"
 	systemctl daemon-reload
 else
 	echo "inky-image.service unchanged."
 fi
 
-echo "[5/5] Restarting service..."
 systemctl restart inky-image.service
 
 echo

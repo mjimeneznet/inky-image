@@ -603,3 +603,66 @@ Suggested next resume steps:
 ### Validation notes
 - `ruff check .` clean; `pytest -q` green.
 - Frontend refactor proven behaviour-preserving by running the same browser smoke check against `HEAD` and against the working tree and diffing the two outputs (15 interaction assertions, zero console errors on both).
+
+## Progress update (2026-11-19) — review hardening
+
+Eleven defects found in a full code review are fixed on `fix/review-hardening` (11 commits,
+127+ tests green, `ruff check .` clean). Delivery (push/PR) is still pending, so `main` does
+not have these changes yet.
+
+### Deployment safety
+- `install.sh` / `update.sh` refuse an unsafe `--target-dir` (system directories, the target
+  user's home, an ancestor of the checkout, a non-empty directory that is not an existing
+  install). The sync is skipped when the checkout is the target, `sed_escape()` protects `\`,
+  `&` and `|` in the unit placeholders, Python dependencies now install *before* project files
+  are replaced, and a failed step prints that the service may still run the previous code.
+- `inky-image.service`: `Wants/After=network-online.target` and `StartLimitIntervalSec=60` +
+  `StartLimitBurst=5`, so a permanently failing start (port 80 taken) surfaces as a failed unit
+  instead of a 10 s restart loop.
+
+### Render pipeline (supersedes earlier notes)
+- `Renderer` gained `last_render_outcome()` returning `ok` / `busy` / `empty` / `failed` per
+  thread. Routes that trigger a render now answer `ok: false` with
+  `Display is busy refreshing; try again.`, `Display refresh failed.` or
+  `No image available to display.` instead of claiming success. `POST /api/settings` keeps
+  `ok: true` (the save succeeded) and adds `render_error` when the panel did not update.
+- `is_render_in_progress()` now spans the whole render critical section (one `_render_slot()`
+  context manager), so the busy badge never reports idle while the display is being driven.
+- `Application.stop()` waits for an in-flight refresh (render lock, 30 s cap) and
+  `ButtonHandler.stop()` waits for the running action; an e-ink write cannot be aborted, so the
+  panel is never left half written.
+- `SlideshowController.toggle()` decides and transitions under one lock, and `shutdown()` is
+  terminal: a late request cannot restart the loop.
+
+### URL source (corrects the note above about `refresh()`)
+- `_UrlSource.refresh()` is now cache-only and never reaches `urlopen`; the earlier statement
+  that it passes stored config entries straight to the downloader no longer holds. Downloads
+  happen in `prefetch_missing()` before `ImageManager._lock` is taken (non-blocking acquire, a
+  concurrent caller skips), called from the render paths only, so `/api/status` stays a pure
+  read and can no longer stall for N x 12 s.
+- `add_url_image()` also downloads before taking the lock.
+
+### Frontend
+- The 5 s `/api/status` poll no longer overwrites a settings field that has focus.
+- Busy/failed toasts show the server's `error` text instead of a hardcoded "Display is busy".
+- `feedback.setUiButtonsDisabled()` no longer re-enables the URL add button; URL validation
+  keeps owning that state.
+
+### Test and tooling notes
+- `requirements-dev.txt` now includes `flask` and `waitress`; without them CI could not import
+  `tests/test_web_app.py`, so the suite CI claimed to run could not run.
+- New: `tests/test_application.py` (render flag scope, dropped render, outcome values, `stop()`
+  draining a refresh) and `tests/test_slideshow.py` (atomic toggle, terminal shutdown), plus
+  render-outcome route tests and the two URL lock tests.
+- The URL lock tests were proved red against the previous `image_manager.py` before landing.
+- `.venv` was rebuilt (`uv`, Python 3.12 + pytest/ruff/flask/waitress): its `python3.14`
+  symlink was dangling. `requirements.txt` cannot install on macOS because `inky` pulls
+  `spidev`, which needs `linux/spi/spidev.h`.
+
+### Known limits after this work
+- No automated JS or shell test exists; those changes were verified by `node --check`, a
+  self-check of `syncField` against the shipped source, `bash -n`, and by extracting and
+  exercising `validate_target_dir` / `sed_escape` from `install.sh`.
+- The deploy scripts still have no rollback of the target tree: the dependency-before-files
+  reordering removes the most likely stale-binary case and the failure message says the service
+  may be running older code, but a failed sync is not restored automatically.

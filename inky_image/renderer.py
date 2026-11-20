@@ -34,3 +34,11 @@ class Renderer(ABC):
     def is_render_in_progress(self) -> bool:
         """Return True when a display refresh is in progress."""
         return False
+
+    def last_render_outcome(self) -> str:
+        """Return how the last render on this thread ended.
+
+        One of ``ok``, ``busy``, ``empty`` or ``failed``: callers report that
+        distinction instead of guessing why a render returned False.
+        """
+        return "ok"

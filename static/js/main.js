@@ -382,6 +382,23 @@ function applyModeUiState(status) {
 	lucide.createIcons();
 }
 
+// The 5s poll must never overwrite a field the user is editing: a partially
+// typed interval would silently revert mid-entry.
+function syncField(id, value, prop) {
+	const element = document.getElementById(id);
+	if (!element || element === document.activeElement) {
+		return;
+	}
+	if (prop === "checked") {
+		element.checked = Boolean(value);
+		return;
+	}
+	const next = String(value);
+	if (element.value !== next) {
+		element.value = next;
+	}
+}
+
 async function refreshStatus() {
 	try {
 		const status = await api("/api/status");
@@ -391,13 +408,13 @@ async function refreshStatus() {
 		renderUrlImages(status);
 		renderUploadImages(status);
 		document.getElementById("current-image-name").textContent = status.current_image_name || "No image available";
-		document.getElementById("interval-input").value = status.slideshow_interval;
-		document.getElementById("saturation-input").value = status.saturation;
-		document.getElementById("scale-to-fit-input").checked = Boolean(status.scale_to_fit);
-		document.getElementById("lock-buttons-input").checked = Boolean(status.lock_buttons);
-		document.getElementById("high-contrast-input").checked = document.body.classList.contains("high-contrast");
-		document.getElementById("render-width-input").value = Number(status.render_width || 800);
-		document.getElementById("render-height-input").value = Number(status.render_height || 480);
+		syncField("interval-input", status.slideshow_interval);
+		syncField("saturation-input", status.saturation);
+		syncField("scale-to-fit-input", status.scale_to_fit, "checked");
+		syncField("lock-buttons-input", status.lock_buttons, "checked");
+		syncField("high-contrast-input", document.body.classList.contains("high-contrast"), "checked");
+		syncField("render-width-input", Number(status.render_width || 800));
+		syncField("render-height-input", Number(status.render_height || 480));
 		if (!state.uiModeInitialized) {
 			setModeButtons(status.mode || "directory", state);
 			state.uiModeInitialized = true;

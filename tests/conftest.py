@@ -123,22 +123,34 @@ class RendererStub:
         self._last_rendered_image_path: str | None = None
         self._last_action: dict[str, str] | None = None
         self._render_in_progress = False
+        self._render_outcome = "ok"
+
+    def _record_render(self) -> bool:
+        """Report whether the simulated refresh reached the panel."""
+        return self._render_outcome == "ok"
 
     def render_current_image(self) -> bool:
         self.render_current_image_calls += 1
-        return True
+        return self._record_render()
 
     def render_next_image(self) -> bool:
         self.render_next_image_calls += 1
-        return True
+        return self._record_render()
 
     def render_previous_image(self) -> bool:
         self.render_previous_image_calls += 1
-        return True
+        return self._record_render()
 
     def cycle_mode_and_render(self) -> bool:
         self.cycle_mode_and_render_calls += 1
-        return True
+        return self._record_render()
+
+    def last_render_outcome(self) -> str:
+        return self._render_outcome
+
+    def set_render_outcome(self, outcome: str) -> None:
+        """Drive the render-outcome contract the routes must report."""
+        self._render_outcome = outcome
 
     def get_last_rendered_image_path(self) -> str | None:
         return self._last_rendered_image_path
