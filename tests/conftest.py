@@ -124,13 +124,15 @@ class RendererStub:
         self._last_action: dict[str, str] | None = None
         self._render_in_progress = False
         self._render_outcome = "ok"
+        self.render_force = False
 
     def _record_render(self) -> bool:
         """Report whether the simulated refresh reached the panel."""
         return self._render_outcome == "ok"
 
-    def render_current_image(self) -> bool:
+    def render_current_image(self, force: bool = False) -> bool:
         self.render_current_image_calls += 1
+        self.render_force = force
         return self._record_render()
 
     def render_next_image(self) -> bool:

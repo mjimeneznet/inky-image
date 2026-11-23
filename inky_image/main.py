@@ -64,24 +64,32 @@ class Application(Renderer):
             renderer=self,
         )
 
-    def render_current_image(self) -> bool:
-        """Render current image on the e-ink display."""
+    def render_current_image(self, force: bool = False) -> bool:
+        """Render current image on the e-ink display.
+
+        Repeated renders of the same image and settings are skipped because a
+        panel refresh is slow and flickers. ``force`` repaints anyway: it is the
+        only way to heal a panel left half written, for example by a service
+        restart that interrupted a refresh.
+        """
         with self._render_slot() as acquired:
             if not acquired:
                 return False
             image_path = self.image_manager.current_image_path()
             if image_path:
-                return self._render_image_path_locked(image_path, "image")
+                return self._render_image_path_locked(
+                    image_path, "image", force=force
+                )
 
             if self.image_manager.get_mode() == "directory":
                 if self.image_manager.get_active_directory() is None:
-                    return self._render_no_image_placeholder_locked()
+                    return self._render_no_image_placeholder_locked(force=force)
                 logger.warning("No image available to display")
                 self._set_render_outcome("empty")
                 return False
-            return self._render_no_image_placeholder_locked()
+            return self._render_no_image_placeholder_locked(force=force)
 
-    def _render_no_image_placeholder_locked(self) -> bool:
+    def _render_no_image_placeholder_locked(self, force: bool = False) -> bool:
         """Render placeholder when no directories are configured."""
         if not self.no_image_path.exists():
             logger.warning(
@@ -91,7 +99,7 @@ class Application(Renderer):
             self._set_render_outcome("empty")
             return False
         return self._render_image_path_locked(
-            str(self.no_image_path), "no-image placeholder"
+            str(self.no_image_path), "no-image placeholder", force=force
         )
 
     def render_next_image(self) -> bool:

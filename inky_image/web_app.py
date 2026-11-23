@@ -498,6 +498,17 @@ def create_web_app(
     def previous_image():
         return _render_response(image_manager, renderer.render_previous_image())
 
+    @app.post("/api/display/repaint")
+    def repaint_display():
+        """Force a full refresh of the current image and settings.
+
+        Skips the identical-render optimisation, which is the only way to heal
+        a panel left half written (a restart that interrupted a refresh).
+        """
+        return _render_response(
+            image_manager, renderer.render_current_image(force=True)
+        )
+
     @app.post("/api/settings")
     def update_settings():
         payload = request.get_json(silent=True) or {}

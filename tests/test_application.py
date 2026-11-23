@@ -140,3 +140,15 @@ def test_stop_waits_for_an_in_flight_refresh(app):
     render.join(5)
     stopper.join(5)
     assert stopper.is_alive() is False
+
+
+def test_force_repaints_the_same_image(app):
+    """The identical-render skip must not block healing a bad panel."""
+    assert app.render_current_image() is True
+    assert len(app.display.rendered) == 1
+
+    assert app.render_current_image() is True
+    assert len(app.display.rendered) == 1, "an identical render is still skipped"
+
+    assert app.render_current_image(force=True) is True
+    assert len(app.display.rendered) == 2, "force must repaint the same image"

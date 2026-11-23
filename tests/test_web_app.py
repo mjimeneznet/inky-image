@@ -595,3 +595,21 @@ class TestRenderOutcomeIsReported:
         assert data["ok"] is True
         assert data["settings"]["saturation"] == 0.8
         assert data["render_error"] == "Display refresh failed."
+
+
+class TestRepaintRoute:
+    """POST /api/display/repaint forces a refresh of the current image."""
+
+    def test_repaint_forces_the_renderer(self, client):
+        data = client.post("/api/display/repaint").get_json()
+
+        assert data["ok"] is True
+        assert client.application.renderer_stub.render_force is True
+
+    def test_repaint_reports_a_dropped_refresh(self, client):
+        client.application.renderer_stub.set_render_outcome("busy")
+
+        data = client.post("/api/display/repaint").get_json()
+
+        assert data["ok"] is False
+        assert data["error"] == "Display is busy refreshing; try again."
