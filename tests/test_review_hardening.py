@@ -172,7 +172,7 @@ class TestDisplayManagerImagePreparation:
         ImageOps.pad.reset_mock()
         dm._resize_image(MagicMock(), (64, 64), scale_to_fit=False)
         ImageOps.pad.assert_called_once()
-        assert ImageOps.pad.call_args.kwargs.get("color") == "white"
+        assert ImageOps.pad.call_args.kwargs.get("color") == "black"
         ImageOps.fit.assert_not_called()
 
         ImageOps.fit.reset_mock()
