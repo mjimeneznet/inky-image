@@ -685,6 +685,21 @@ class TestPreviewOverrides:
         assert status["contrast"] == 1.0
         assert status["saturation"] == 0.5
 
+    def test_preview_carries_the_render_mode(self, client):
+        client.application.renderer_stub.set_preview_png(self.PNG)
+
+        client.get("/api/debug/rendered-preview?render_mode=oklab")
+
+        assert client.application.renderer_stub.preview_overrides["render_mode"] == (
+            "oklab"
+        )
+
+    def test_preview_rejects_an_unknown_mode(self, client):
+        resp = client.get("/api/debug/rendered-preview?render_mode=wat")
+
+        assert resp.status_code == 400
+        assert resp.get_json()["error"] == "Invalid render_mode"
+
     def test_preview_without_parameters_uses_saved_settings(self, client):
         client.application.renderer_stub.set_preview_png(self.PNG)
 
@@ -706,3 +721,25 @@ class TestPreviewOverrides:
         overrides = client.application.renderer_stub.preview_overrides
         assert overrides["contrast"] == 2.0
         assert overrides["brightness"] == 0.25
+
+
+class TestRenderModeSetting:
+    """POST /api/settings selects one of the three dithering strategies."""
+
+    def test_status_reports_the_mode(self, client):
+        assert client.get("/api/status").get_json()["render_mode"] == "default"
+
+    def test_each_mode_is_accepted_and_repaints(self, client):
+        stub = client.application.renderer_stub
+        for mode in ("palette", "oklab", "default"):
+            before = stub.render_current_image_calls
+            data = client.post("/api/settings", json={"render_mode": mode}).get_json()
+            assert data["ok"] is True
+            assert data["settings"]["render_mode"] == mode
+            assert stub.render_current_image_calls == before + 1
+
+    def test_unknown_mode_is_rejected(self, client):
+        resp = client.post("/api/settings", json={"render_mode": "wat"})
+
+        assert resp.status_code == 400
+        assert resp.get_json()["error"] == "Invalid render_mode"

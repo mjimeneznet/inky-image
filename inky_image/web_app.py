@@ -130,6 +130,7 @@ def create_web_app(
         status["slideshow_interval"] = int(config.get("slideshow_interval", 30))
         status["saturation"] = float(config.get("saturation", 0.5))
         status["brightness"] = float(config.get("brightness", 1.0))
+        status["render_mode"] = str(config.get("render_mode", "default"))
         status["contrast"] = float(config.get("contrast", 1.0))
         status["scale_to_fit"] = bool(config.get("scale_to_fit", True))
         status["lock_buttons"] = bool(config.get("lock_buttons", False))
@@ -519,6 +520,7 @@ def create_web_app(
         saturation = payload.get("saturation")
         brightness = payload.get("brightness")
         contrast = payload.get("contrast")
+        render_mode = payload.get("render_mode")
         scale_to_fit = payload.get("scale_to_fit")
         lock_buttons = payload.get("lock_buttons")
         render_width = payload.get("render_width")
@@ -547,6 +549,11 @@ def create_web_app(
                 updates["contrast"] = max(0.25, min(2.0, float(contrast)))
             except (ValueError, TypeError):
                 return jsonify({"ok": False, "error": "Invalid contrast"}), 400
+        if render_mode is not None:
+            normalized_mode = str(render_mode).strip().lower()
+            if normalized_mode not in {"default", "palette", "oklab"}:
+                return jsonify({"ok": False, "error": "Invalid render_mode"}), 400
+            updates["render_mode"] = normalized_mode
         if scale_to_fit is not None:
             if isinstance(scale_to_fit, bool):
                 updates["scale_to_fit"] = scale_to_fit
@@ -573,6 +580,7 @@ def create_web_app(
             config.update(updates)
             if (
                 "saturation" in updates
+                or "render_mode" in updates
                 or "brightness" in updates
                 or "contrast" in updates
                 or "scale_to_fit" in updates
@@ -641,6 +649,12 @@ def create_web_app(
             overrides[key] = (
                 int(value) if key in {"render_width", "render_height"} else value
             )
+        raw_mode = request.args.get("render_mode")
+        if raw_mode is not None and raw_mode.strip():
+            normalised = raw_mode.strip().lower()
+            if normalised not in {"default", "palette", "oklab"}:
+                raise ValueError("render_mode")
+            overrides["render_mode"] = normalised
         raw_fit = request.args.get("scale_to_fit")
         if raw_fit is not None and raw_fit.strip():
             normalised = raw_fit.strip().lower()

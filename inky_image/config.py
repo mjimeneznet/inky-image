@@ -8,6 +8,8 @@ import threading
 from pathlib import Path
 from typing import Any
 
+RENDER_MODES = {"default", "palette", "oklab"}
+
 MODE_LIST_MAP: dict[str, str] = {
     "image_list": "selected_images",
     "url": "url_images",
@@ -22,6 +24,7 @@ DEFAULT_CONFIG = {
     "url_images": [],
     "uploaded_images": [],
     "slideshow_mode": "directory",
+    "render_mode": "default",
     "slideshow_interval": 30,
     "slideshow_running": False,
     "saturation": 0.5,
@@ -120,6 +123,10 @@ class ConfigManager:
                 mode
                 if mode in {"directory", "image_list", "url", "upload"}
                 else "directory"
+            )
+            render_mode = str(self._data.get("render_mode", "default")).strip().lower()
+            self._data["render_mode"] = (
+                render_mode if render_mode in RENDER_MODES else "default"
             )
             self._data["current_image_index"] = _safe_int(
                 self._data.get("current_image_index", 0), 0

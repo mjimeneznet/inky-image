@@ -219,6 +219,7 @@ class Application(Renderer):
                 "target_height": int(self.config.get("render_height", 480)),
                 "brightness": float(self.config.get("brightness", 1.0)),
                 "contrast": float(self.config.get("contrast", 1.0)),
+                "render_mode": str(self.config.get("render_mode", "default")),
             }
             if overrides:
                 values["target_width"] = int(
@@ -227,7 +228,13 @@ class Application(Renderer):
                 values["target_height"] = int(
                     overrides.get("render_height", values["target_height"])
                 )
-                for key in ("saturation", "brightness", "contrast", "scale_to_fit"):
+                for key in (
+                    "saturation",
+                    "brightness",
+                    "contrast",
+                    "scale_to_fit",
+                    "render_mode",
+                ):
                     if key in overrides:
                         values[key] = overrides[key]
             try:
@@ -255,6 +262,7 @@ class Application(Renderer):
         render_height = int(self.config.get("render_height", 480))
         brightness = float(self.config.get("brightness", 1.0))
         contrast = float(self.config.get("contrast", 1.0))
+        render_mode = str(self.config.get("render_mode", "default"))
         signature = (
             image_path,
             saturation,
@@ -263,6 +271,7 @@ class Application(Renderer):
             render_height,
             brightness,
             contrast,
+            render_mode,
         )
         if not force and self._last_render_signature == signature:
             logger.info("Skipping render for %s (same image and settings)", label)
@@ -277,6 +286,7 @@ class Application(Renderer):
                 target_height=render_height,
                 brightness=brightness,
                 contrast=contrast,
+                render_mode=render_mode,
             )
             self._last_render_signature = signature
             self.config.set("last_rendered_image_path", image_path)

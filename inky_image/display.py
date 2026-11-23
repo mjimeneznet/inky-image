@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from PIL import Image, ImageEnhance, ImageOps
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 try:
     from inky.auto import auto
@@ -39,6 +39,7 @@ class DisplayManager:
         target_height: int | None = None,
         brightness: float = 1.0,
         contrast: float = 1.0,
+        render_mode: str = "default",
     ) -> None:
         """Load a file, convert for e-ink and render on screen."""
         path_obj = Path(image_path)
@@ -54,6 +55,7 @@ class DisplayManager:
             target_height=target_height,
             brightness=brightness,
             contrast=contrast,
+            render_mode=render_mode,
         )
 
     def display_pil_image(
@@ -65,6 +67,7 @@ class DisplayManager:
         target_height: int | None = None,
         brightness: float = 1.0,
         contrast: float = 1.0,
+        render_mode: str = "default",
     ) -> None:
         """Process and show a PIL image on Inky display."""
         processed = self._prepare_image(
@@ -74,8 +77,9 @@ class DisplayManager:
             target_height=target_height,
             brightness=brightness,
             contrast=contrast,
+            render_mode=render_mode,
         )
-        self._show_prepared(processed, saturation)
+        self._show_prepared(processed, saturation, render_mode)
 
     def prepare_image_path(
         self,
@@ -85,6 +89,7 @@ class DisplayManager:
         target_height: int | None = None,
         brightness: float = 1.0,
         contrast: float = 1.0,
+        render_mode: str = "default",
     ) -> Image.Image:
         """Load and convert a file exactly as a real render would.
 
@@ -102,6 +107,7 @@ class DisplayManager:
             target_height=target_height,
             brightness=brightness,
             contrast=contrast,
+            render_mode=render_mode,
         )
 
     def preview_image_path(
@@ -113,6 +119,7 @@ class DisplayManager:
         target_height: int | None = None,
         brightness: float = 1.0,
         contrast: float = 1.0,
+        render_mode: str = "default",
     ) -> Image.Image:
         """Return the frame the panel would show, dithering included.
 
@@ -127,8 +134,11 @@ class DisplayManager:
             target_height=target_height,
             brightness=brightness,
             contrast=contrast,
+            render_mode=render_mode,
         )
-        return self._quantise_for_preview(prepared, saturation)
+        if render_mode == "default":
+            return self._quantise_for_preview(prepared, saturation)
+        return self._palette_image(prepared, render_mode).convert("RGB")
 
     def _quantise_for_preview(
         self, image: Image.Image, saturation: float
@@ -153,11 +163,133 @@ class DisplayManager:
             logger.warning("Panel preview unavailable; returning prepared frame")
             return image
 
-    def _show_prepared(self, prepared: Image.Image, saturation: float) -> None:
+    def _show_prepared(
+        self,
+        prepared: Image.Image,
+        saturation: float,
+        render_mode: str = "default",
+    ) -> None:
         """Quantise an already prepared frame and push it to the panel."""
-        saturation = max(0.0, min(1.0, float(saturation)))
-        self._display.set_image(prepared, saturation=saturation)
+        if render_mode == "default":
+            saturation = max(0.0, min(1.0, float(saturation)))
+            self._display.set_image(prepared, saturation=saturation)
+        else:
+            # A P image makes the driver copy indices straight to its buffer:
+            # no second dithering pass over our own.
+            self._display.set_image(self._palette_image(prepared, render_mode))
         self._display.show()
+
+    def _panel_palette(self) -> list[int]:
+        """The panel's measured inks, flattened, in the driver's index order."""
+        blend = getattr(self._display, "_palette_blend", None)
+        if callable(blend):
+            try:
+                palette = [int(value) for value in blend(1.0)]
+                if len(palette) >= 24:
+                    return palette
+            except Exception:  # pragma: no cover - driver internals changed
+                logger.warning("Could not read the panel palette")
+        # Measured inks of the 7.3" Impression (AC073TC1A SATURATED_PALETTE).
+        return [
+            0, 0, 0,
+            217, 242, 255,
+            3, 124, 76,
+            27, 46, 198,
+            245, 80, 34,
+            255, 255, 68,
+            239, 121, 44,
+            255, 255, 255,
+        ]
+
+    def _palette_image(self, image: Image.Image, render_mode: str) -> Image.Image:
+        """Reduce a prepared frame to the panel palette with the chosen strategy."""
+        palette = self._panel_palette()
+        if render_mode == "oklab":
+            try:
+                indices = self._oklab_indices(image, palette)
+            except Exception:  # pragma: no cover - missing numpy or odd frame
+                logger.warning("Oklab quantisation unavailable; using Floyd-Steinberg")
+                return self._floyd_steinberg(image, palette)
+            return self._index_image(indices, palette)
+        return self._floyd_steinberg(image, palette)
+
+    def _floyd_steinberg(
+        self, image: Image.Image, palette: list[int]
+    ) -> Image.Image:
+        """Error-diffusion dithering against the measured palette."""
+        palette_image = Image.new("P", (1, 1))
+        palette_image.putpalette(self._pad_palette(palette))
+        return image.quantize(
+            palette=palette_image, dither=Image.Dither.FLOYDSTEINBERG
+        )
+
+    @staticmethod
+    def _pad_palette(palette: list[int]) -> list[int]:
+        return ([int(value) for value in palette] + [0, 0, 0] * 256)[:768]
+
+    def _index_image(self, indices, palette: list[int]) -> Image.Image:
+        image = Image.fromarray(indices, mode="P")
+        image.putpalette(self._pad_palette(palette))
+        return image
+
+    _BAYER8 = (
+        (0, 32, 8, 40, 2, 34, 10, 42),
+        (48, 16, 56, 24, 50, 18, 58, 26),
+        (12, 44, 4, 36, 14, 46, 6, 38),
+        (60, 28, 52, 20, 62, 30, 54, 22),
+        (3, 35, 11, 43, 1, 33, 9, 41),
+        (51, 19, 59, 27, 49, 17, 57, 25),
+        (15, 47, 7, 39, 13, 45, 5, 37),
+        (63, 31, 55, 23, 61, 29, 53, 21),
+    )
+    # How far the ordered pattern pushes a pixel in Oklab before matching an ink.
+    _OKLAB_AMPLITUDE = 0.09
+
+    def _oklab_indices(self, image: Image.Image, palette: list[int]):
+        """Ordered-dither in Oklab against the measured inks (vectorised)."""
+        import numpy
+
+        rgb = numpy.asarray(image.convert("RGB"), dtype="float32") / 255.0
+        inks = numpy.asarray(
+            [palette[index : index + 3] for index in range(0, 21, 3)],
+            dtype="float32",
+        ) / 255.0
+        lab = self._srgb_to_oklab(rgb)
+        ink_lab = self._srgb_to_oklab(inks)
+        height, width = lab.shape[:2]
+        bayer = numpy.asarray(self._BAYER8, dtype="float32") / 64.0 - 0.5
+        tile = numpy.tile(
+            bayer, (height // 8 + 1, width // 8 + 1)
+        )[:height, :width]
+        lab = lab + tile[:, :, None] * self._OKLAB_AMPLITUDE
+        delta = lab[:, :, None, :] - ink_lab[None, None, :, :]
+        return numpy.argmin((delta * delta).sum(-1), axis=-1).astype("uint8")
+
+    @staticmethod
+    def _srgb_to_oklab(rgb):
+        """sRGB 0..1 to Oklab (Bjorn Ottosson's reference matrices)."""
+        import numpy
+
+        linear = numpy.where(
+            rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4
+        )
+        lms = linear @ numpy.array(
+            [
+                [0.4122214708, 0.5363325363, 0.0514459929],
+                [0.2119034982, 0.6806995451, 0.1073969566],
+                [0.0883024619, 0.2817188376, 0.6299787005],
+            ],
+            dtype="float32",
+        ).T
+        lms = numpy.cbrt(lms)
+        return lms @ numpy.array(
+            [
+                [0.2104542553, 0.7936177850, -0.0040720468],
+                [1.9779984951, -2.4285922050, 0.4505937099],
+                [0.0259040371, 0.7827717662, -0.8086757660],
+            ],
+            dtype="float32",
+        ).T
 
     def _prepare_image(
         self,
@@ -167,6 +299,7 @@ class DisplayManager:
         target_height: int | None = None,
         brightness: float = 1.0,
         contrast: float = 1.0,
+        render_mode: str = "default",
     ) -> Image.Image:
         """Apply orientation fix, tone, colorspace conversion and resize.
 
@@ -191,8 +324,14 @@ class DisplayManager:
         if (width, height) != (self.width, self.height):
             # Keep compatibility with hardware by adapting configured render
             # size to real panel size.
-            return self._resize_image(
+            resized = self._resize_image(
                 resized, (self.width, self.height), scale_to_fit=scale_to_fit
+            )
+        if render_mode == "oklab":
+            # Sharpening belongs before quantisation: it changes which ink each
+            # edge picks, and the panel cannot sharpen anything afterwards.
+            resized = resized.filter(
+                ImageFilter.UnsharpMask(radius=1.5, percent=120, threshold=3)
             )
         return resized
 

@@ -149,6 +149,14 @@
 			<label for="saturation-input">Inky saturation (0 = pure vivid palette, 1 = muted ink palette)</label>
 			<input id="saturation-input" type="number" min="0" max="1" step="0.1">
 			<p class="setting-hint">Range 0 - 1, step 0.1. This is a palette blend, not photo saturation: 0 quantises to pure primaries (more punch, cruder), 1 to the panel's measured inks (softer, more faithful). 0.5 is Pimoroni's default. Lower it if colours look dull.</p>
+			<label for="render-mode-input">Dithering strategy</label>
+			<select id="render-mode-input">
+				<option value="default">Default (driver dithering, keeps the current look)</option>
+				<option value="palette">Own dithering, measured inks (P mode, no second pass)</option>
+				<option value="oklab">Perceptual Oklab + sharpening (best for photos)</option>
+			</select>
+			<p class="setting-hint">Default hands the frame to the driver, which blends the palette by the saturation value and dithers once. The other two convert here and pass a P image so the driver copies it untouched; Oklab matches inks by perceptual distance and sharpens edges first. Compare them with Refresh preview before saving. Saturation only affects Default.</p>
+
 			<label for="brightness-input">Brightness before dithering (1.0 = unchanged)</label>
 			<input id="brightness-input" type="number" min="0.25" max="2" step="0.05">
 			<p class="setting-hint">Range 0.25 - 2.0, step 0.05. Moves the whole photo lighter or darker before the panel picks inks. Raise to 1.1 - 1.2 when a photo looks grey; go back to 1.0 if whites start to glare.</p>

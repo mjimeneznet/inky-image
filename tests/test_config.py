@@ -310,3 +310,23 @@ class TestToneSettings:
 
         assert reloaded.get("brightness") == 1.35
         assert reloaded.get("contrast") == 0.8
+
+
+class TestRenderMode:
+    """The dithering strategy is validated like any other enum setting."""
+
+    def test_default_mode_is_the_current_behaviour(self, config):
+        assert config.get("render_mode") == "default"
+
+    def test_unknown_mode_falls_back_to_default(self, config):
+        config.set("render_mode", "wat")
+
+        reloaded = type(config)(str(config.config_path))
+
+        assert reloaded.get("render_mode") == "default"
+
+    def test_valid_modes_survive_a_reload(self, config):
+        for mode in ("palette", "oklab"):
+            config.set("render_mode", mode)
+            reloaded = type(config)(str(config.config_path))
+            assert reloaded.get("render_mode") == mode

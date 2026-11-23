@@ -240,3 +240,14 @@ def test_preview_translates_size_overrides(app):
 
     assert seen["target_width"] == 640
     assert seen["target_height"] == 400
+
+
+def test_render_mode_reaches_the_display_and_forces_a_repaint(app):
+    assert app.render_current_image() is True
+    assert app.display.kwargs[-1]["render_mode"] == "default"
+    assert len(app.display.rendered) == 1
+
+    app.config.set("render_mode", "oklab")
+    assert app.render_current_image() is True
+    assert len(app.display.rendered) == 2, "switching strategy must repaint"
+    assert app.display.kwargs[-1]["render_mode"] == "oklab"

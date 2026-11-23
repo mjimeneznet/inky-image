@@ -431,6 +431,7 @@ async function refreshStatus() {
 		syncField("saturation-input", status.saturation);
 		syncField("brightness-input", status.brightness);
 		syncField("contrast-input", status.contrast);
+		syncField("render-mode-input", status.render_mode || "default");
 		syncField("scale-to-fit-input", status.scale_to_fit, "checked");
 		syncField("lock-buttons-input", status.lock_buttons, "checked");
 		syncField("high-contrast-input", document.body.classList.contains("high-contrast"), "checked");
@@ -670,6 +671,7 @@ function readSettingsForm() {
 	const settings = {
 		scale_to_fit: document.getElementById("scale-to-fit-input").checked,
 		lock_buttons: document.getElementById("lock-buttons-input").checked,
+		render_mode: document.getElementById("render-mode-input").value || "default",
 	};
 	const interval = numberField("interval-input", 30, 86400);
 	const saturation = numberField("saturation-input", 0, 1);
@@ -713,6 +715,7 @@ async function refreshPanelPreview() {
 		}
 	}
 	params.set("scale_to_fit", settings.scale_to_fit ? "1" : "0");
+	params.set("render_mode", settings.render_mode);
 	params.set("t", Date.now());
 
 	if (status) {
