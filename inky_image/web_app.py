@@ -658,7 +658,18 @@ def create_web_app(
             return jsonify({"ok": False, "error": f"Invalid {exc}"}), 400
         png = renderer.render_preview_png(overrides)
         if not png:
-            return jsonify({"ok": False, "error": "No image to preview"}), 404
+            messages = {
+                "busy": (
+                    "Display is busy refreshing; try again in a moment.",
+                    409,
+                ),
+                "empty": ("No current image to preview; activate an image first.", 404),
+            }
+            message, code = messages.get(
+                renderer.preview_unavailable_reason(),
+                ("Preview failed; check the service log.", 500),
+            )
+            return jsonify({"ok": False, "error": message}), code
         response = send_file(BytesIO(png), mimetype="image/png")
         response.headers["Cache-Control"] = "no-store"
         return response

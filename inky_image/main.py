@@ -50,6 +50,7 @@ class Application(Renderer):
         # Per-thread so a route answers with the outcome of its own render even
         # while another thread drives the display.
         self._render_outcome = threading.local()
+        self._preview_reason = threading.local()
 
         self.slideshow = SlideshowController(
             interval_seconds_getter=lambda: int(
@@ -175,6 +176,13 @@ class Application(Renderer):
             self._render_in_progress = False
             self._render_lock.release()
 
+    def preview_unavailable_reason(self) -> str:
+        """Why the last preview returned nothing, for the caller to explain."""
+        return getattr(self._preview_reason, "value", "empty")
+
+    def _set_preview_reason(self, reason: str) -> None:
+        self._preview_reason.value = reason
+
     def _set_render_outcome(self, outcome: str) -> None:
         """Record this thread's render outcome for the caller to report."""
         self._render_outcome.value = outcome
@@ -192,10 +200,17 @@ class Application(Renderer):
         (nothing else calls show()), hence the render lock.
         """
         if not self._render_lock.acquire(blocking=False):
+            self._set_preview_reason("busy")
             return None
         try:
-            image_path = self.image_manager.current_image_path()
+            # Fall back to what the panel last showed: that is what the user is
+            # looking at, even when the active source has no current image.
+            image_path = (
+                self.image_manager.current_image_path()
+                or self.get_last_rendered_image_path()
+            )
             if not image_path:
+                self._set_preview_reason("empty")
                 return None
             values = {
                 "saturation": float(self.config.get("saturation", 0.5)),
@@ -211,9 +226,11 @@ class Application(Renderer):
                 preview = self.display.preview_image_path(image_path, **values)
             except Exception as exc:  # pragma: no cover - hardware path
                 logger.exception("Preview failed for %s: %s", image_path, exc)
+                self._set_preview_reason("failed")
                 return None
             buffer = io.BytesIO()
             preview.save(buffer, format="PNG")
+            self._set_preview_reason("")
             return buffer.getvalue()
         finally:
             self._render_lock.release()

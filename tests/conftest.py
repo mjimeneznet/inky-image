@@ -127,14 +127,19 @@ class RendererStub:
         self.render_force = False
         self.preview_png: bytes | None = None
         self.preview_overrides: dict | None = None
+        self.preview_reason = "empty"
 
     def render_preview_png(self, overrides: dict | None = None) -> bytes | None:
         self.preview_overrides = overrides
         return self.preview_png
 
-    def set_preview_png(self, png: bytes | None) -> None:
+    def preview_unavailable_reason(self) -> str:
+        return self.preview_reason
+
+    def set_preview_png(self, png: bytes | None, reason: str = "empty") -> None:
         """Drive the diagnostic preview route."""
         self.preview_png = png
+        self.preview_reason = reason
 
     def _record_render(self) -> bool:
         """Report whether the simulated refresh reached the panel."""

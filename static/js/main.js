@@ -698,11 +698,12 @@ function readSettingsForm() {
 	return settings;
 }
 
-function refreshPanelPreview() {
+async function refreshPanelPreview() {
 	const image = document.getElementById("panel-preview");
 	if (!image) {
 		return;
 	}
+	const status = document.getElementById("panel-preview-status");
 	// Preview the values in the form, saved or not, so you can tune before saving.
 	const settings = readSettingsForm();
 	const params = new URLSearchParams();
@@ -713,7 +714,37 @@ function refreshPanelPreview() {
 	}
 	params.set("scale_to_fit", settings.scale_to_fit ? "1" : "0");
 	params.set("t", Date.now());
-	image.src = `/api/debug/rendered-preview?${params.toString()}`;
+
+	if (status) {
+		status.textContent = "";
+	}
+	feedback.showBusyBadge("Building panel preview...");
+	try {
+		const response = await fetch(`/api/debug/rendered-preview?${params.toString()}`, { cache: "no-store" });
+		if (!response.ok) {
+			const body = await response.json().catch(() => ({}));
+			const message = body.error || `Preview unavailable (${response.status}).`;
+			if (status) {
+				status.textContent = message;
+			}
+			feedback.showMessage(message);
+			return;
+		}
+		const blob = await response.blob();
+		if (image.dataset.objectUrl) {
+			URL.revokeObjectURL(image.dataset.objectUrl);
+		}
+		const url = URL.createObjectURL(blob);
+		image.dataset.objectUrl = url;
+		image.src = url;
+	} catch (error) {
+		if (status) {
+			status.textContent = "Preview request failed.";
+		}
+		feedback.showMessage("Preview request failed.");
+	} finally {
+		feedback.hideBusyBadge();
+	}
 }
 
 function bindSettingsForm() {

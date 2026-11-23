@@ -42,6 +42,10 @@ class Renderer(ABC):
         """
         return None
 
+    def preview_unavailable_reason(self) -> str:
+        """Why the last preview returned nothing: ``busy``, ``empty`` or ``failed``."""
+        return "empty"
+
     def last_render_outcome(self) -> str:
         """Return how the last render on this thread ended.
 

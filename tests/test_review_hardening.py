@@ -227,9 +227,29 @@ class TestRenderedPreviewRoute:
         assert resp.data == png
 
     def test_reports_no_frame(self, client):
-        client.application.renderer_stub.set_preview_png(None)
+        client.application.renderer_stub.set_preview_png(None, reason="empty")
 
         resp = client.get("/api/debug/rendered-preview")
 
         assert resp.status_code == 404
-        assert resp.get_json()["error"] == "No image to preview"
+        assert resp.get_json()["error"] == (
+            "No current image to preview; activate an image first."
+        )
+
+    def test_reports_a_busy_display(self, client):
+        client.application.renderer_stub.set_preview_png(None, reason="busy")
+
+        resp = client.get("/api/debug/rendered-preview")
+
+        assert resp.status_code == 409
+        assert resp.get_json()["error"] == (
+            "Display is busy refreshing; try again in a moment."
+        )
+
+    def test_reports_a_failed_preview(self, client):
+        client.application.renderer_stub.set_preview_png(None, reason="failed")
+
+        resp = client.get("/api/debug/rendered-preview")
+
+        assert resp.status_code == 500
+        assert "check the service log" in resp.get_json()["error"]

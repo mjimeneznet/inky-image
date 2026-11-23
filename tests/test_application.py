@@ -198,3 +198,25 @@ def test_preview_applies_form_overrides_without_saving(app):
     assert app.config.get("contrast") == 1.1, "preview must not persist anything"
     assert app._render_lock.acquire(blocking=False) is True, "lock must be released"
     app._render_lock.release()
+
+
+def test_preview_falls_back_to_the_last_rendered_image(app):
+    """The panel shows the last render; the preview should show the same."""
+    app.image_manager.deactivate_directory(0)
+    app.config.set("last_rendered_image_path", str(app.no_image_path))
+    seen: dict = {}
+
+    class Preview:
+        def save(self, _buffer, format=None):
+            return None
+
+    def fake_preview(image_path, **kwargs):
+        seen["image_path"] = image_path
+        return Preview()
+
+    app.display.preview_image_path = fake_preview
+
+    app.render_preview_png()
+
+    assert seen["image_path"] == str(app.no_image_path)
+    assert app.preview_unavailable_reason() == "", "a successful preview has no reason"
