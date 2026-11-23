@@ -399,6 +399,25 @@ function syncField(id, value, prop) {
 	}
 }
 
+// A setting input that is empty or half typed must never be saved: Number("") is 0,
+// which would store saturation 0 and render a washed out image, and an empty
+// size field would store 64 and upscale a thumbnail to the panel.
+function numberField(id, min, max) {
+	const element = document.getElementById(id);
+	if (!element) {
+		return null;
+	}
+	const raw = String(element.value || "").trim();
+	if (!raw) {
+		return null;
+	}
+	const value = Number(raw);
+	if (!Number.isFinite(value)) {
+		return null;
+	}
+	return Math.min(max, Math.max(min, value));
+}
+
 async function refreshStatus() {
 	try {
 		const status = await api("/api/status");
@@ -648,22 +667,31 @@ function bindDisplayControls() {
 function bindSettingsForm() {
 	document.getElementById("save-settings-button").onclick = async () => {
 		await runUiAction(async () => {
-			const interval = Math.max(30, Number(document.getElementById("interval-input").value));
-			const saturation = Number(document.getElementById("saturation-input").value);
+			const interval = numberField("interval-input", 30, 86400);
+			const saturation = numberField("saturation-input", 0, 1);
 			const scaleToFit = document.getElementById("scale-to-fit-input").checked;
 			const lockButtons = document.getElementById("lock-buttons-input").checked;
-			const renderWidth = Math.max(64, Number(document.getElementById("render-width-input").value));
-			const renderHeight = Math.max(64, Number(document.getElementById("render-height-input").value));
-			await api("/api/settings", {
+			const renderWidth = numberField("render-width-input", 64, 10000);
+			const renderHeight = numberField("render-height-input", 64, 10000);
+			const settings = {
+				scale_to_fit: scaleToFit,
+				lock_buttons: lockButtons,
+			};
+			if (interval !== null) {
+				settings.slideshow_interval = interval;
+			}
+			if (saturation !== null) {
+				settings.saturation = saturation;
+			}
+			if (renderWidth !== null) {
+				settings.render_width = renderWidth;
+			}
+			if (renderHeight !== null) {
+				settings.render_height = renderHeight;
+			}
+			const result = await api("/api/settings", {
 				method: "POST",
-				body: JSON.stringify({
-					slideshow_interval: interval,
-					saturation,
-					scale_to_fit: scaleToFit,
-					lock_buttons: lockButtons,
-					render_width: renderWidth,
-					render_height: renderHeight,
-				}),
+				body: JSON.stringify(settings),
 			});
 			feedback.showBadge("Settings saved", "success");
 			await refreshStatus();
