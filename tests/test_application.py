@@ -220,3 +220,23 @@ def test_preview_falls_back_to_the_last_rendered_image(app):
 
     assert seen["image_path"] == str(app.no_image_path)
     assert app.preview_unavailable_reason() == "", "a successful preview has no reason"
+
+
+def test_preview_translates_size_overrides(app):
+    """The route speaks render_width; the display takes target_width."""
+    seen: dict = {}
+
+    class Preview:
+        def save(self, _buffer, format=None):
+            return None
+
+    def fake_preview(image_path, **kwargs):
+        seen.update(kwargs)
+        return Preview()
+
+    app.display.preview_image_path = fake_preview
+
+    app.render_preview_png({"render_width": 640, "render_height": 400})
+
+    assert seen["target_width"] == 640
+    assert seen["target_height"] == 400

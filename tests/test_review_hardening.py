@@ -253,3 +253,13 @@ class TestRenderedPreviewRoute:
 
         assert resp.status_code == 500
         assert "check the service log" in resp.get_json()["error"]
+
+    def test_reports_the_cause_of_a_failed_preview(self, client):
+        client.application.renderer_stub.set_preview_png(
+            None, reason="failed: unexpected keyword argument"
+        )
+
+        resp = client.get("/api/debug/rendered-preview")
+
+        assert resp.status_code == 500
+        assert resp.get_json()["error"] == "unexpected keyword argument"

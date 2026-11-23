@@ -665,8 +665,11 @@ def create_web_app(
                 ),
                 "empty": ("No current image to preview; activate an image first.", 404),
             }
+            reason = renderer.preview_unavailable_reason()
+            if reason.startswith("failed: "):
+                return jsonify({"ok": False, "error": reason[8:]}), 500
             message, code = messages.get(
-                renderer.preview_unavailable_reason(),
+                reason,
                 ("Preview failed; check the service log.", 500),
             )
             return jsonify({"ok": False, "error": message}), code

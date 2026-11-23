@@ -221,12 +221,22 @@ class Application(Renderer):
                 "contrast": float(self.config.get("contrast", 1.0)),
             }
             if overrides:
-                values.update(overrides)
+                values["target_width"] = int(
+                    overrides.get("render_width", values["target_width"])
+                )
+                values["target_height"] = int(
+                    overrides.get("render_height", values["target_height"])
+                )
+                for key in ("saturation", "brightness", "contrast", "scale_to_fit"):
+                    if key in overrides:
+                        values[key] = overrides[key]
             try:
                 preview = self.display.preview_image_path(image_path, **values)
             except Exception as exc:  # pragma: no cover - hardware path
                 logger.exception("Preview failed for %s: %s", image_path, exc)
-                self._set_preview_reason("failed")
+                # Keep the cause: a debug route with a generic message is what
+                # made this take two round trips.
+                self._set_preview_reason(f"failed: {exc}")
                 return None
             buffer = io.BytesIO()
             preview.save(buffer, format="PNG")
