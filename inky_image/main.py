@@ -183,6 +183,14 @@ class Application(Renderer):
     def _set_preview_reason(self, reason: str) -> None:
         self._preview_reason.value = reason
 
+    def _palette_source(self) -> str:
+        """``driver``, ``pure`` or the literal hex list the custom modes use."""
+        mode = str(self.config.get("panel_palette", "driver"))
+        if mode == "custom":
+            custom = str(self.config.get("panel_palette_custom", "")).strip()
+            return custom or "driver"
+        return mode
+
     def _set_render_outcome(self, outcome: str) -> None:
         """Record this thread's render outcome for the caller to report."""
         self._render_outcome.value = outcome
@@ -220,6 +228,7 @@ class Application(Renderer):
                 "brightness": float(self.config.get("brightness", 1.0)),
                 "contrast": float(self.config.get("contrast", 1.0)),
                 "render_mode": str(self.config.get("render_mode", "default")),
+                "palette_source": self._palette_source(),
             }
             if overrides:
                 values["target_width"] = int(
@@ -234,6 +243,7 @@ class Application(Renderer):
                     "contrast",
                     "scale_to_fit",
                     "render_mode",
+                    "palette_source",
                 ):
                     if key in overrides:
                         values[key] = overrides[key]
@@ -263,6 +273,7 @@ class Application(Renderer):
         brightness = float(self.config.get("brightness", 1.0))
         contrast = float(self.config.get("contrast", 1.0))
         render_mode = str(self.config.get("render_mode", "default"))
+        palette_source = self._palette_source()
         signature = (
             image_path,
             saturation,
@@ -272,6 +283,7 @@ class Application(Renderer):
             brightness,
             contrast,
             render_mode,
+            palette_source,
         )
         if not force and self._last_render_signature == signature:
             logger.info("Skipping render for %s (same image and settings)", label)
@@ -287,6 +299,7 @@ class Application(Renderer):
                 brightness=brightness,
                 contrast=contrast,
                 render_mode=render_mode,
+                palette_source=palette_source,
             )
             self._last_render_signature = signature
             self.config.set("last_rendered_image_path", image_path)

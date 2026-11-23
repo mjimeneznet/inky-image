@@ -4,11 +4,27 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 from pathlib import Path
 from typing import Any
 
 RENDER_MODES = {"default", "palette", "oklab"}
+PANEL_PALETTES = {"driver", "pure", "custom"}
+INK_NAMES = ("black", "white", "green", "blue", "red", "yellow", "orange")
+
+
+def parse_ink_palette(raw: Any) -> list[str] | None:
+    """Seven ``#rrggbb`` values in driver index order, or None when invalid."""
+    if not isinstance(raw, str):
+        return None
+    codes = [code.strip() for code in re.split(r"[,\s]+", raw) if code.strip()]
+    if len(codes) != len(INK_NAMES):
+        return None
+    for code in codes:
+        if not re.fullmatch(r"#?[0-9a-fA-F]{6}", code):
+            return None
+    return ["#" + code.lstrip("#").lower() for code in codes]
 
 MODE_LIST_MAP: dict[str, str] = {
     "image_list": "selected_images",
@@ -25,6 +41,8 @@ DEFAULT_CONFIG = {
     "uploaded_images": [],
     "slideshow_mode": "directory",
     "render_mode": "default",
+    "panel_palette": "driver",
+    "panel_palette_custom": "",
     "slideshow_interval": 30,
     "slideshow_running": False,
     "saturation": 0.5,
@@ -128,6 +146,17 @@ class ConfigManager:
             self._data["render_mode"] = (
                 render_mode if render_mode in RENDER_MODES else "default"
             )
+            panel_palette = (
+                str(self._data.get("panel_palette", "driver")).strip().lower()
+            )
+            self._data["panel_palette"] = (
+                panel_palette if panel_palette in PANEL_PALETTES else "driver"
+            )
+            custom = parse_ink_palette(self._data.get("panel_palette_custom", ""))
+            self._data["panel_palette_custom"] = ", ".join(custom) if custom else ""
+            if self._data["panel_palette"] == "custom" and not custom:
+                # Custom without a usable list would render with nothing to match.
+                self._data["panel_palette"] = "driver"
             self._data["current_image_index"] = _safe_int(
                 self._data.get("current_image_index", 0), 0
             )

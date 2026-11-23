@@ -432,6 +432,8 @@ async function refreshStatus() {
 		syncField("brightness-input", status.brightness);
 		syncField("contrast-input", status.contrast);
 		syncField("render-mode-input", status.render_mode || "default");
+		syncField("panel-palette-input", status.panel_palette || "driver");
+		syncField("panel-palette-custom-input", status.panel_palette_custom || "");
 		syncField("scale-to-fit-input", status.scale_to_fit, "checked");
 		syncField("lock-buttons-input", status.lock_buttons, "checked");
 		syncField("high-contrast-input", document.body.classList.contains("high-contrast"), "checked");
@@ -672,7 +674,14 @@ function readSettingsForm() {
 		scale_to_fit: document.getElementById("scale-to-fit-input").checked,
 		lock_buttons: document.getElementById("lock-buttons-input").checked,
 		render_mode: document.getElementById("render-mode-input").value || "default",
+		panel_palette: document.getElementById("panel-palette-input").value || "driver",
 	};
+	const customPalette = String(
+		document.getElementById("panel-palette-custom-input").value || ""
+	).trim();
+	if (customPalette) {
+		settings.panel_palette_custom = customPalette;
+	}
 	const interval = numberField("interval-input", 30, 86400);
 	const saturation = numberField("saturation-input", 0, 1);
 	const brightness = numberField("brightness-input", 0.25, 2);
@@ -716,6 +725,10 @@ async function refreshPanelPreview() {
 	}
 	params.set("scale_to_fit", settings.scale_to_fit ? "1" : "0");
 	params.set("render_mode", settings.render_mode);
+	params.set("panel_palette", settings.panel_palette);
+	if (settings.panel_palette_custom) {
+		params.set("panel_palette_custom", settings.panel_palette_custom);
+	}
 	params.set("t", Date.now());
 
 	if (status) {

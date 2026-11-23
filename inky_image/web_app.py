@@ -11,7 +11,7 @@ from typing import Callable
 
 from flask import Flask, jsonify, render_template, request, send_file
 
-from inky_image.config import ConfigManager
+from inky_image.config import ConfigManager, parse_ink_palette
 from inky_image.image_manager import SUPPORTED_EXTENSIONS, ImageManager
 from inky_image.renderer import Renderer
 from inky_image.slideshow import SlideshowController
@@ -131,6 +131,10 @@ def create_web_app(
         status["saturation"] = float(config.get("saturation", 0.5))
         status["brightness"] = float(config.get("brightness", 1.0))
         status["render_mode"] = str(config.get("render_mode", "default"))
+        status["panel_palette"] = str(config.get("panel_palette", "driver"))
+        status["panel_palette_custom"] = str(
+            config.get("panel_palette_custom", "")
+        )
         status["contrast"] = float(config.get("contrast", 1.0))
         status["scale_to_fit"] = bool(config.get("scale_to_fit", True))
         status["lock_buttons"] = bool(config.get("lock_buttons", False))
@@ -521,6 +525,8 @@ def create_web_app(
         brightness = payload.get("brightness")
         contrast = payload.get("contrast")
         render_mode = payload.get("render_mode")
+        panel_palette = payload.get("panel_palette")
+        panel_palette_custom = payload.get("panel_palette_custom")
         scale_to_fit = payload.get("scale_to_fit")
         lock_buttons = payload.get("lock_buttons")
         render_width = payload.get("render_width")
@@ -554,6 +560,23 @@ def create_web_app(
             if normalized_mode not in {"default", "palette", "oklab"}:
                 return jsonify({"ok": False, "error": "Invalid render_mode"}), 400
             updates["render_mode"] = normalized_mode
+        if panel_palette is not None:
+            normalized_palette = str(panel_palette).strip().lower()
+            if normalized_palette not in {"driver", "pure", "custom"}:
+                return jsonify({"ok": False, "error": "Invalid panel_palette"}), 400
+            updates["panel_palette"] = normalized_palette
+        if panel_palette_custom is not None:
+            parsed = parse_ink_palette(panel_palette_custom)
+            if parsed is None:
+                return jsonify(
+                    {
+                        "ok": False,
+                        "error": "Invalid panel_palette_custom",
+                    }
+                ), 400
+            updates["panel_palette_custom"] = ", ".join(parsed)
+            if updates.get("panel_palette", config.get("panel_palette")) == "custom":
+                updates.setdefault("panel_palette", "custom")
         if scale_to_fit is not None:
             if isinstance(scale_to_fit, bool):
                 updates["scale_to_fit"] = scale_to_fit
@@ -581,6 +604,8 @@ def create_web_app(
             if (
                 "saturation" in updates
                 or "render_mode" in updates
+                or "panel_palette" in updates
+                or "panel_palette_custom" in updates
                 or "brightness" in updates
                 or "contrast" in updates
                 or "scale_to_fit" in updates
@@ -655,6 +680,21 @@ def create_web_app(
             if normalised not in {"default", "palette", "oklab"}:
                 raise ValueError("render_mode")
             overrides["render_mode"] = normalised
+        raw_palette = request.args.get("panel_palette")
+        raw_custom = request.args.get("panel_palette_custom")
+        palette_mode: str | None = None
+        if raw_palette is not None and raw_palette.strip():
+            palette_mode = raw_palette.strip().lower()
+            if palette_mode not in {"driver", "pure", "custom"}:
+                raise ValueError("panel_palette")
+        if raw_custom is not None and raw_custom.strip():
+            parsed = parse_ink_palette(raw_custom)
+            if parsed is None:
+                raise ValueError("panel_palette_custom")
+            if palette_mode in (None, "custom"):
+                overrides["palette_source"] = ", ".join(parsed)
+        if palette_mode in {"driver", "pure"}:
+            overrides["palette_source"] = palette_mode
         raw_fit = request.args.get("scale_to_fit")
         if raw_fit is not None and raw_fit.strip():
             normalised = raw_fit.strip().lower()

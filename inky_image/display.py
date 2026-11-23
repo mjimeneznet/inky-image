@@ -40,6 +40,7 @@ class DisplayManager:
         brightness: float = 1.0,
         contrast: float = 1.0,
         render_mode: str = "default",
+        palette_source: str = "driver",
     ) -> None:
         """Load a file, convert for e-ink and render on screen."""
         path_obj = Path(image_path)
@@ -56,6 +57,7 @@ class DisplayManager:
             brightness=brightness,
             contrast=contrast,
             render_mode=render_mode,
+            palette_source=palette_source,
         )
 
     def display_pil_image(
@@ -68,6 +70,7 @@ class DisplayManager:
         brightness: float = 1.0,
         contrast: float = 1.0,
         render_mode: str = "default",
+        palette_source: str = "driver",
     ) -> None:
         """Process and show a PIL image on Inky display."""
         processed = self._prepare_image(
@@ -79,7 +82,7 @@ class DisplayManager:
             contrast=contrast,
             render_mode=render_mode,
         )
-        self._show_prepared(processed, saturation, render_mode)
+        self._show_prepared(processed, saturation, render_mode, palette_source)
 
     def prepare_image_path(
         self,
@@ -90,6 +93,7 @@ class DisplayManager:
         brightness: float = 1.0,
         contrast: float = 1.0,
         render_mode: str = "default",
+        palette_source: str = "driver",
     ) -> Image.Image:
         """Load and convert a file exactly as a real render would.
 
@@ -120,6 +124,7 @@ class DisplayManager:
         brightness: float = 1.0,
         contrast: float = 1.0,
         render_mode: str = "default",
+        palette_source: str = "driver",
     ) -> Image.Image:
         """Return the frame the panel would show, dithering included.
 
@@ -135,10 +140,13 @@ class DisplayManager:
             brightness=brightness,
             contrast=contrast,
             render_mode=render_mode,
+            palette_source=palette_source,
         )
         if render_mode == "default":
             return self._quantise_for_preview(prepared, saturation)
-        return self._palette_image(prepared, render_mode).convert("RGB")
+        return self._palette_image(prepared, render_mode, palette_source).convert(
+            "RGB"
+        )
 
     def _quantise_for_preview(
         self, image: Image.Image, saturation: float
@@ -168,6 +176,7 @@ class DisplayManager:
         prepared: Image.Image,
         saturation: float,
         render_mode: str = "default",
+        palette_source: str = "driver",
     ) -> None:
         """Quantise an already prepared frame and push it to the panel."""
         if render_mode == "default":
@@ -176,11 +185,37 @@ class DisplayManager:
         else:
             # A P image makes the driver copy indices straight to its buffer:
             # no second dithering pass over our own.
-            self._display.set_image(self._palette_image(prepared, render_mode))
+            self._display.set_image(
+                self._palette_image(prepared, render_mode, palette_source)
+            )
         self._display.show()
 
-    def _panel_palette(self) -> list[int]:
-        """The panel's measured inks, flattened, in the driver's index order."""
+    def _panel_palette(self, source: str = "driver") -> list[int]:
+        """Ink palette for the custom modes, flattened, in driver index order.
+
+        ``source`` is ``driver`` (the panel's measured inks), ``pure`` (the
+        theoretical primaries) or a comma separated list of seven hex values.
+        """
+        if source.startswith("#"):
+            parsed = []
+            for code in source.replace(" ", "").split(","):
+                text = code.lstrip("#")
+                if len(text) != 6:
+                    continue
+                parsed.extend(int(text[index : index + 2], 16) for index in (0, 2, 4))
+            if len(parsed) == 21:
+                return parsed + [255, 255, 255]
+        if source == "pure":
+            return [
+                0, 0, 0,
+                255, 255, 255,
+                0, 255, 0,
+                0, 0, 255,
+                255, 0, 0,
+                255, 255, 0,
+                255, 140, 0,
+                255, 255, 255,
+            ]
         blend = getattr(self._display, "_palette_blend", None)
         if callable(blend):
             try:
@@ -201,9 +236,11 @@ class DisplayManager:
             255, 255, 255,
         ]
 
-    def _palette_image(self, image: Image.Image, render_mode: str) -> Image.Image:
+    def _palette_image(
+        self, image: Image.Image, render_mode: str, palette_source: str = "driver"
+    ) -> Image.Image:
         """Reduce a prepared frame to the panel palette with the chosen strategy."""
-        palette = self._panel_palette()
+        palette = self._panel_palette(palette_source)
         if render_mode == "oklab":
             try:
                 indices = self._oklab_indices(image, palette)

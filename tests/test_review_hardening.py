@@ -263,3 +263,39 @@ class TestRenderedPreviewRoute:
 
         assert resp.status_code == 500
         assert resp.get_json()["error"] == "unexpected keyword argument"
+
+
+class TestRenderModesDoNotRaise:
+    """Every strategy must survive the real DisplayManager call chain.
+
+    The web and application tests drive fake display objects, so a mismatched
+    keyword between the public methods and _prepare_image would only show up on
+    the Pi. This walks the real methods with PIL mocked.
+    """
+
+    def test_all_three_modes_reach_set_image(self, tmp_path):
+        from inky_image.display import DisplayManager
+
+        image_path = tmp_path / "photo.jpg"
+        image_path.write_text("fake-jpg")
+
+        display = DisplayManager()
+        display.width = 800
+        display.height = 480
+
+        for mode in ("default", "palette", "oklab"):
+            for palette in ("driver", "pure"):
+                display.display_image_path(
+                    str(image_path),
+                    render_mode=mode,
+                    palette_source=palette,
+                    target_width=800,
+                    target_height=480,
+                )
+            display.preview_image_path(
+                str(image_path),
+                render_mode=mode,
+                palette_source="driver",
+                target_width=800,
+                target_height=480,
+            )

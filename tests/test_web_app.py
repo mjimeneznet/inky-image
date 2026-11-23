@@ -743,3 +743,44 @@ class TestRenderModeSetting:
 
         assert resp.status_code == 400
         assert resp.get_json()["error"] == "Invalid render_mode"
+
+
+class TestPanelPaletteSetting:
+    """The measured ink palette can be overridden from Settings."""
+
+    HEXES = "#a02020, #f0e050, #608050, #5080b8, #000000, #ffffff, #ff8c00"
+
+    def test_status_exposes_both_keys(self, client):
+        status = client.get("/api/status").get_json()
+
+        assert status["panel_palette"] == "driver"
+        assert status["panel_palette_custom"] == ""
+
+    def test_custom_palette_is_accepted_and_repaints(self, client):
+        stub = client.application.renderer_stub
+        before = stub.render_current_image_calls
+
+        data = client.post(
+            "/api/settings",
+            json={"panel_palette": "custom", "panel_palette_custom": self.HEXES},
+        ).get_json()
+
+        assert data["ok"] is True
+        assert data["settings"]["panel_palette"] == "custom"
+        assert data["settings"]["panel_palette_custom"].startswith("#a02020")
+        assert stub.render_current_image_calls == before + 1
+
+    def test_unknown_mode_is_rejected(self, client):
+        resp = client.post("/api/settings", json={"panel_palette": "wat"})
+
+        assert resp.status_code == 400
+        assert resp.get_json()["error"] == "Invalid panel_palette"
+
+    def test_malformed_hex_list_is_rejected(self, client):
+        resp = client.post(
+            "/api/settings",
+            json={"panel_palette": "custom", "panel_palette_custom": "#000000"},
+        )
+
+        assert resp.status_code == 400
+        assert resp.get_json()["error"] == "Invalid panel_palette_custom"

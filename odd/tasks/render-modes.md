@@ -65,3 +65,16 @@ L3: Implementation notes and measured cost.
   produce different output from the same source.
 - The Oklab transform round-trips white to L=1.0 and black to L=0.0.
 - Saturation only affects `default`; that is stated in the UI hint.
+
+L4: Palette override (requested after the Pimoroni forum thread).
+- `panel_palette`: `driver` (default, the driver's measured inks), `pure` (theoretical primaries)
+  or `custom` plus `panel_palette_custom`, seven `#rrggbb` values in driver index order
+  (black, white, green, blue, red, yellow, orange).
+- Validated at load and at the API: a malformed list is refused with 400; a custom mode with no
+  usable list falls back to `driver` at load.
+- Applies to the two custom strategies only; `default` keeps the driver's own palette blend.
+- Accepted by the preview route, so a pasted palette can be compared without a refresh.
+- Measured on the Oklab path: raising the chroma of the dithering targets (the forum technique)
+  made the perceived Oklab error worse in our ordered dither (0.111 at x0.7 rising to 0.139 at
+  x2.0), so no built-in boost was shipped; the palette is what can be tuned, by hand, on the
+  panel.

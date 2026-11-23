@@ -251,3 +251,21 @@ def test_render_mode_reaches_the_display_and_forces_a_repaint(app):
     assert app.render_current_image() is True
     assert len(app.display.rendered) == 2, "switching strategy must repaint"
     assert app.display.kwargs[-1]["render_mode"] == "oklab"
+
+
+def test_panel_palette_reaches_the_display_and_forces_a_repaint(app):
+    assert app.render_current_image() is True
+    assert app.display.kwargs[-1]["palette_source"] == "driver"
+    assert len(app.display.rendered) == 1
+
+    app.config.set("panel_palette", "pure")
+    assert app.render_current_image() is True
+    assert len(app.display.rendered) == 2, "a palette change must repaint"
+    assert app.display.kwargs[-1]["palette_source"] == "pure"
+
+    hexes = "#000000, #ffffff, #00ff00, #0000ff, #ff0000, #ffff00, #ff8c00"
+    app.config.set("panel_palette", "custom")
+    app.config.set("panel_palette_custom", hexes)
+    assert app.render_current_image() is True
+    assert len(app.display.rendered) == 3
+    assert app.display.kwargs[-1]["palette_source"] == hexes

@@ -330,3 +330,42 @@ class TestRenderMode:
             config.set("render_mode", mode)
             reloaded = type(config)(str(config.config_path))
             assert reloaded.get("render_mode") == mode
+
+
+class TestPanelPalette:
+    """Measured ink values are optional and validated before use."""
+
+    def test_default_is_the_driver_palette(self, config):
+        assert config.get("panel_palette") == "driver"
+        assert config.get("panel_palette_custom") == ""
+
+    def test_valid_custom_list_survives_a_reload(self, config):
+        config.set("panel_palette", "custom")
+        config.set(
+            "panel_palette_custom",
+            "#000000,#ffffff,#00ff00,#0000ff,#ff0000,#ffff00,#ff8c00",
+        )
+
+        reloaded = type(config)(str(config.config_path))
+
+        assert reloaded.get("panel_palette") == "custom"
+        assert reloaded.get("panel_palette_custom") == (
+            "#000000, #ffffff, #00ff00, #0000ff, #ff0000, #ffff00, #ff8c00"
+        )
+
+    def test_custom_without_a_usable_list_falls_back_to_driver(self, config):
+        config.set("panel_palette", "custom")
+        config.set("panel_palette_custom", "not a palette")
+
+        reloaded = type(config)(str(config.config_path))
+
+        assert reloaded.get("panel_palette") == "driver"
+        assert reloaded.get("panel_palette_custom") == ""
+
+    def test_garbage_list_is_dropped_but_the_mode_is_kept(self, config):
+        config.set("panel_palette_custom", "#000000, #ffffff")
+
+        reloaded = type(config)(str(config.config_path))
+
+        assert reloaded.get("panel_palette") == "driver"
+        assert reloaded.get("panel_palette_custom") == ""
