@@ -108,13 +108,12 @@ class DisplayManager:
 
         Based on InkyPi image_folder plugin behavior.
 
-        Padding uses black on purpose: an e-ink panel renders pure white at full
-        brightness, so a white frame around a photo glares and makes the photo
-        itself look washed out.
+        Padding is white to match the panel background, so an uncropped photo
+        looks like it sits on the paper rather than inside a frame.
         """
         desired_width, desired_height = int(desired_size[0]), int(desired_size[1])
         dimensions = (desired_width, desired_height)
         if scale_to_fit:
             return ImageOps.fit(image, dimensions, method=Image.LANCZOS)
-        return ImageOps.pad(image, dimensions, color="black", method=Image.LANCZOS)
+        return ImageOps.pad(image, dimensions, color="white", method=Image.LANCZOS)
 
