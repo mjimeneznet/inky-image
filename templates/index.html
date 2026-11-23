@@ -143,31 +143,39 @@
 		<section id="settings-panel" class="panel settings-panel">
 			<h2>Settings</h2>
 			<label for="interval-input">Slideshow interval (seconds)</label>
-			<input id="interval-input" type="number" min="30" step="1">
+			<input id="interval-input" type="number" min="30" max="86400" step="1">
+			<p class="setting-hint">Range 30 - 86400. Each step waits for a full panel refresh (15-20 s), so shorter intervals are refused.</p>
 
 			<label for="saturation-input">Inky saturation (0 = pure vivid palette, 1 = muted ink palette)</label>
 			<input id="saturation-input" type="number" min="0" max="1" step="0.1">
+			<p class="setting-hint">Range 0 - 1, step 0.1. This is a palette blend, not photo saturation: 0 quantises to pure primaries (more punch, cruder), 1 to the panel's measured inks (softer, more faithful). 0.5 is Pimoroni's default. Lower it if colours look dull.</p>
 			<label for="brightness-input">Brightness before dithering (1.0 = unchanged)</label>
 			<input id="brightness-input" type="number" min="0.25" max="2" step="0.05">
+			<p class="setting-hint">Range 0.25 - 2.0, step 0.05. Moves the whole photo lighter or darker before the panel picks inks. Raise to 1.1 - 1.2 when a photo looks grey; go back to 1.0 if whites start to glare.</p>
 			<label for="contrast-input">Contrast before dithering (1.0 = unchanged)</label>
 			<input id="contrast-input" type="number" min="0.25" max="2" step="0.05">
+			<p class="setting-hint">Range 0.25 - 2.0, step 0.05. Spreads light and dark before ink selection, which is what separates similar tones. 1.2 - 1.4 usually helps photos; above 1.5 shadows start to block up.</p>
 
 			<div class="row setting-toggle">
 				<input id="scale-to-fit-input" type="checkbox">
 				<label for="scale-to-fit-input">Crop to fill screen (unchecked: whole image, white borders)</label>
 			</div>
+			<p class="setting-hint">Checked: the photo fills the panel and its edges are cropped. Unchecked: the whole photo fits inside, padded with white (the brightest surface on screen).</p>
 			<div class="row setting-toggle">
 				<input id="lock-buttons-input" type="checkbox">
 				<label for="lock-buttons-input">Lock physical buttons (A/B/C/D)</label>
 			</div>
+			<p class="setting-hint">Ignores A/B/C/D on the panel, so nothing changes while you are away. The web controls keep working.</p>
 			<div class="row setting-toggle">
 				<input id="high-contrast-input" type="checkbox">
 				<label for="high-contrast-input">High contrast mode</label>
 			</div>
+			<p class="setting-hint">Browser UI only (dark page, brighter text). It does not change what the panel shows.</p>
 			<label for="render-width-input">Render width (pixels)</label>
-			<input id="render-width-input" type="number" min="64" step="1">
+			<input id="render-width-input" type="number" min="64" max="10000" step="1">
 			<label for="render-height-input">Render height (pixels)</label>
-			<input id="render-height-input" type="number" min="64" step="1">
+			<input id="render-height-input" type="number" min="64" max="10000" step="1">
+			<p class="setting-hint">Range 64 - 10000. Frame size before the panel scales it to its own 800 x 480. Keep both at the panel size: any other value only adds a second resize and softens the image.</p>
 
 			<button id="save-settings-button">Save settings</button>
 			<pre id="status-output"></pre>
