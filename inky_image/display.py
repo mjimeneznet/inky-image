@@ -104,6 +104,55 @@ class DisplayManager:
             contrast=contrast,
         )
 
+    def preview_image_path(
+        self,
+        image_path: str,
+        saturation: float = 0.5,
+        scale_to_fit: bool = True,
+        target_width: int | None = None,
+        target_height: int | None = None,
+        brightness: float = 1.0,
+        contrast: float = 1.0,
+    ) -> Image.Image:
+        """Return the frame the panel would show, dithering included.
+
+        Runs the same preparation as a real render and then the driver's own
+        quantiser, rebuilding the result with the blended palette. ``show()`` is
+        never called, so the panel is untouched.
+        """
+        prepared = self.prepare_image_path(
+            image_path,
+            scale_to_fit=scale_to_fit,
+            target_width=target_width,
+            target_height=target_height,
+            brightness=brightness,
+            contrast=contrast,
+        )
+        return self._quantise_for_preview(prepared, saturation)
+
+    def _quantise_for_preview(
+        self, image: Image.Image, saturation: float
+    ) -> Image.Image:
+        """Map a prepared frame through the driver palette, without showing it."""
+        driver = self._display
+        blend = getattr(driver, "_palette_blend", None)
+        set_image = getattr(driver, "set_image", None)
+        if blend is None or set_image is None:
+            return image
+        saturation = max(0.0, min(1.0, float(saturation)))
+        try:
+            set_image(image, saturation=saturation)
+            buf = getattr(driver, "buf", None)
+            palette = list(blend(saturation))
+            if buf is None or len(palette) < 24:
+                return image
+            preview = Image.fromarray(buf.astype("uint8"), mode="P")
+            preview.putpalette([int(value) for value in palette] + [0, 0, 0] * 248)
+            return preview.convert("RGB")
+        except Exception:  # pragma: no cover - driver internals changed
+            logger.warning("Panel preview unavailable; returning prepared frame")
+            return image
+
     def _show_prepared(self, prepared: Image.Image, saturation: float) -> None:
         """Quantise an already prepared frame and push it to the panel."""
         saturation = max(0.0, min(1.0, float(saturation)))

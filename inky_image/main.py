@@ -184,30 +184,36 @@ class Application(Renderer):
         return getattr(self._render_outcome, "value", "ok")
 
     def render_preview_png(self) -> bytes | None:
-        """Return the frame the pipeline would send, without touching the panel.
+        """Return the frame the panel would show, dithering included, as PNG.
 
-        Diagnostic only: it runs the same sizing, padding and colour path as a
-        real render, so a washed out result here means the pipeline is the
-        problem and a crisp one points at the panel or its palette step.
+        Same preparation as a render plus the driver's own palette quantiser, so
+        what the browser shows is what the panel would paint. The driver buffer
+        is rewritten (nothing else calls show()), hence the render lock.
         """
-        image_path = self.image_manager.current_image_path()
-        if not image_path:
+        if not self._render_lock.acquire(blocking=False):
             return None
         try:
-            prepared = self.display.prepare_image_path(
-                image_path,
-                scale_to_fit=bool(self.config.get("scale_to_fit", True)),
-                target_width=int(self.config.get("render_width", 800)),
-                target_height=int(self.config.get("render_height", 480)),
-                brightness=float(self.config.get("brightness", 1.0)),
-                contrast=float(self.config.get("contrast", 1.0)),
-            )
-        except Exception as exc:  # pragma: no cover - hardware path
-            logger.exception("Preview failed for %s: %s", image_path, exc)
-            return None
-        buffer = io.BytesIO()
-        prepared.save(buffer, format="PNG")
-        return buffer.getvalue()
+            image_path = self.image_manager.current_image_path()
+            if not image_path:
+                return None
+            try:
+                preview = self.display.preview_image_path(
+                    image_path,
+                    saturation=float(self.config.get("saturation", 0.5)),
+                    scale_to_fit=bool(self.config.get("scale_to_fit", True)),
+                    target_width=int(self.config.get("render_width", 800)),
+                    target_height=int(self.config.get("render_height", 480)),
+                    brightness=float(self.config.get("brightness", 1.0)),
+                    contrast=float(self.config.get("contrast", 1.0)),
+                )
+            except Exception as exc:  # pragma: no cover - hardware path
+                logger.exception("Preview failed for %s: %s", image_path, exc)
+                return None
+            buffer = io.BytesIO()
+            preview.save(buffer, format="PNG")
+            return buffer.getvalue()
+        finally:
+            self._render_lock.release()
 
     def _render_image_path_locked(
         self, image_path: str, label: str, force: bool = False

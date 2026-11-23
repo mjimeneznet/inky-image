@@ -666,7 +666,19 @@ function bindDisplayControls() {
 	};
 }
 
+function refreshPanelPreview() {
+	const image = document.getElementById("panel-preview");
+	if (!image) {
+		return;
+	}
+	// Cache-buster: the PNG is rebuilt from the live settings on every request.
+	image.src = `/api/debug/rendered-preview?t=${Date.now()}`;
+}
+
 function bindSettingsForm() {
+	document.getElementById("refresh-preview-button").onclick = () => {
+		refreshPanelPreview();
+	};
 	document.getElementById("save-settings-button").onclick = async () => {
 		await runUiAction(async () => {
 			const interval = numberField("interval-input", 30, 86400);
@@ -703,7 +715,13 @@ function bindSettingsForm() {
 				method: "POST",
 				body: JSON.stringify(settings),
 			});
-			feedback.showBadge("Settings saved", "success");
+			if (result && result.render_error) {
+				feedback.showMessage(`Settings saved, but the display did not refresh: ${result.render_error}`);
+				feedback.showBadge("Settings saved; display not refreshed", "warning");
+			} else {
+				feedback.showBadge("Settings saved", "success");
+			}
+			refreshPanelPreview();
 			await refreshStatus();
 		}, { startMessage: "Saving settings..." });
 	};

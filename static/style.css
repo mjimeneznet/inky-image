@@ -364,6 +364,16 @@ h2 {
 	margin-top: 12px;
 }
 
+.panel-preview {
+	display: block;
+	width: 100%;
+	max-width: 800px;
+	margin: 8px 0 6px;
+	border: 1px solid var(--panel-border);
+	border-radius: 10px;
+	background: #0b1220;
+}
+
 .setting-hint {
 	margin: 4px 0 14px;
 	font-size: 0.82rem;

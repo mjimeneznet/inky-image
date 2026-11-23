@@ -178,6 +178,12 @@
 			<p class="setting-hint">Range 64 - 10000. Frame size before the panel scales it to its own 800 x 480. Keep both at the panel size: any other value only adds a second resize and softens the image.</p>
 
 			<button id="save-settings-button">Save settings</button>
+
+			<h3>Panel preview</h3>
+			<img id="panel-preview" class="panel-preview" alt="Dithered preview of the current image"
+				src="/api/debug/rendered-preview">
+			<p class="setting-hint">Dithered with the saved brightness, contrast, saturation and crop settings, exactly as the panel would paint it. Press the button after saving a change.</p>
+			<button id="refresh-preview-button" type="button">Refresh preview</button>
 			<pre id="status-output"></pre>
 		</section>
 	</main>
