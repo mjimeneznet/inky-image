@@ -619,10 +619,44 @@ def create_web_app(
             )
         return _render_response(image_manager, renderer.render_current_image())
 
+    def _preview_overrides() -> dict | None:
+        """Candidate settings from the query string, so preview runs before save."""
+        overrides: dict = {}
+        numeric = {
+            "saturation": (0.0, 1.0),
+            "brightness": (0.25, 2.0),
+            "contrast": (0.25, 2.0),
+            "render_width": (64, 10000),
+            "render_height": (64, 10000),
+        }
+        for key, (low, high) in numeric.items():
+            raw = request.args.get(key)
+            if raw is None or not raw.strip():
+                continue
+            try:
+                value = float(raw)
+            except (TypeError, ValueError):
+                raise ValueError(key) from None
+            value = max(low, min(high, value))
+            overrides[key] = (
+                int(value) if key in {"render_width", "render_height"} else value
+            )
+        raw_fit = request.args.get("scale_to_fit")
+        if raw_fit is not None and raw_fit.strip():
+            normalised = raw_fit.strip().lower()
+            if normalised not in {"0", "1", "true", "false", "on", "off"}:
+                raise ValueError("scale_to_fit")
+            overrides["scale_to_fit"] = normalised in {"1", "true", "on"}
+        return overrides or None
+
     @app.get("/api/debug/rendered-preview")
     def rendered_preview():
         """Return the frame the pipeline would send, without touching the panel."""
-        png = renderer.render_preview_png()
+        try:
+            overrides = _preview_overrides()
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": f"Invalid {exc}"}), 400
+        png = renderer.render_preview_png(overrides)
         if not png:
             return jsonify({"ok": False, "error": "No image to preview"}), 404
         response = send_file(BytesIO(png), mimetype="image/png")

@@ -183,12 +183,13 @@ class Application(Renderer):
         """Return how the last render on this thread ended."""
         return getattr(self._render_outcome, "value", "ok")
 
-    def render_preview_png(self) -> bytes | None:
+    def render_preview_png(self, overrides: dict | None = None) -> bytes | None:
         """Return the frame the panel would show, dithering included, as PNG.
 
         Same preparation as a render plus the driver's own palette quantiser, so
-        what the browser shows is what the panel would paint. The driver buffer
-        is rewritten (nothing else calls show()), hence the render lock.
+        what the browser shows is what the panel would paint. ``overrides``
+        previews unsaved candidate settings. The driver buffer is rewritten
+        (nothing else calls show()), hence the render lock.
         """
         if not self._render_lock.acquire(blocking=False):
             return None
@@ -196,16 +197,18 @@ class Application(Renderer):
             image_path = self.image_manager.current_image_path()
             if not image_path:
                 return None
+            values = {
+                "saturation": float(self.config.get("saturation", 0.5)),
+                "scale_to_fit": bool(self.config.get("scale_to_fit", True)),
+                "target_width": int(self.config.get("render_width", 800)),
+                "target_height": int(self.config.get("render_height", 480)),
+                "brightness": float(self.config.get("brightness", 1.0)),
+                "contrast": float(self.config.get("contrast", 1.0)),
+            }
+            if overrides:
+                values.update(overrides)
             try:
-                preview = self.display.preview_image_path(
-                    image_path,
-                    saturation=float(self.config.get("saturation", 0.5)),
-                    scale_to_fit=bool(self.config.get("scale_to_fit", True)),
-                    target_width=int(self.config.get("render_width", 800)),
-                    target_height=int(self.config.get("render_height", 480)),
-                    brightness=float(self.config.get("brightness", 1.0)),
-                    contrast=float(self.config.get("contrast", 1.0)),
-                )
+                preview = self.display.preview_image_path(image_path, **values)
             except Exception as exc:  # pragma: no cover - hardware path
                 logger.exception("Preview failed for %s: %s", image_path, exc)
                 return None

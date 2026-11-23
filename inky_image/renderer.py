@@ -35,8 +35,11 @@ class Renderer(ABC):
         """Return True when a display refresh is in progress."""
         return False
 
-    def render_preview_png(self) -> bytes | None:
-        """Return the frame the pipeline would send, without touching the panel."""
+    def render_preview_png(self, overrides: dict | None = None) -> bytes | None:
+        """Return the frame the panel would show, without touching the panel.
+
+        ``overrides`` lets a caller preview candidate settings before saving them.
+        """
         return None
 
     def last_render_outcome(self) -> str:

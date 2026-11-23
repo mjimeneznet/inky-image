@@ -172,3 +172,29 @@ def test_changing_tone_settings_forces_a_repaint(app):
     assert app.render_current_image() is True
     assert len(app.display.rendered) == 3
     assert app.display.kwargs[-1]["contrast"] == 1.4
+
+
+def test_preview_applies_form_overrides_without_saving(app):
+    """The preview must run on candidate values, leaving the config alone."""
+    seen: dict = {}
+
+    class Preview:
+        def save(self, _buffer, format=None):
+            return None
+
+    def fake_preview(image_path, **kwargs):
+        seen.update(kwargs)
+        seen["image_path"] = image_path
+        return Preview()
+
+    app.display.preview_image_path = fake_preview
+    app.config.set("contrast", 1.1)
+
+    app.render_preview_png({"contrast": 1.6, "scale_to_fit": False})
+
+    assert seen["contrast"] == 1.6, "override must win over the saved value"
+    assert seen["scale_to_fit"] is False
+    assert seen["saturation"] == 0.5, "unrelated values still come from the config"
+    assert app.config.get("contrast") == 1.1, "preview must not persist anything"
+    assert app._render_lock.acquire(blocking=False) is True, "lock must be released"
+    app._render_lock.release()

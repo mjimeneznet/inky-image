@@ -666,13 +666,54 @@ function bindDisplayControls() {
 	};
 }
 
+function readSettingsForm() {
+	const settings = {
+		scale_to_fit: document.getElementById("scale-to-fit-input").checked,
+		lock_buttons: document.getElementById("lock-buttons-input").checked,
+	};
+	const interval = numberField("interval-input", 30, 86400);
+	const saturation = numberField("saturation-input", 0, 1);
+	const brightness = numberField("brightness-input", 0.25, 2);
+	const contrast = numberField("contrast-input", 0.25, 2);
+	const renderWidth = numberField("render-width-input", 64, 10000);
+	const renderHeight = numberField("render-height-input", 64, 10000);
+	if (interval !== null) {
+		settings.slideshow_interval = interval;
+	}
+	if (saturation !== null) {
+		settings.saturation = saturation;
+	}
+	if (brightness !== null) {
+		settings.brightness = brightness;
+	}
+	if (contrast !== null) {
+		settings.contrast = contrast;
+	}
+	if (renderWidth !== null) {
+		settings.render_width = renderWidth;
+	}
+	if (renderHeight !== null) {
+		settings.render_height = renderHeight;
+	}
+	return settings;
+}
+
 function refreshPanelPreview() {
 	const image = document.getElementById("panel-preview");
 	if (!image) {
 		return;
 	}
-	// Cache-buster: the PNG is rebuilt from the live settings on every request.
-	image.src = `/api/debug/rendered-preview?t=${Date.now()}`;
+	// Preview the values in the form, saved or not, so you can tune before saving.
+	const settings = readSettingsForm();
+	const params = new URLSearchParams();
+	for (const key of ["saturation", "brightness", "contrast", "render_width", "render_height"]) {
+		if (settings[key] !== undefined) {
+			params.set(key, settings[key]);
+		}
+	}
+	params.set("scale_to_fit", settings.scale_to_fit ? "1" : "0");
+	params.set("t", Date.now());
+	image.src = `/api/debug/rendered-preview?${params.toString()}`;
 }
 
 function bindSettingsForm() {
@@ -681,36 +722,7 @@ function bindSettingsForm() {
 	};
 	document.getElementById("save-settings-button").onclick = async () => {
 		await runUiAction(async () => {
-			const interval = numberField("interval-input", 30, 86400);
-			const saturation = numberField("saturation-input", 0, 1);
-			const brightness = numberField("brightness-input", 0.25, 2);
-			const contrast = numberField("contrast-input", 0.25, 2);
-			const scaleToFit = document.getElementById("scale-to-fit-input").checked;
-			const lockButtons = document.getElementById("lock-buttons-input").checked;
-			const renderWidth = numberField("render-width-input", 64, 10000);
-			const renderHeight = numberField("render-height-input", 64, 10000);
-			const settings = {
-				scale_to_fit: scaleToFit,
-				lock_buttons: lockButtons,
-			};
-			if (interval !== null) {
-				settings.slideshow_interval = interval;
-			}
-			if (saturation !== null) {
-				settings.saturation = saturation;
-			}
-			if (brightness !== null) {
-				settings.brightness = brightness;
-			}
-			if (contrast !== null) {
-				settings.contrast = contrast;
-			}
-			if (renderWidth !== null) {
-				settings.render_width = renderWidth;
-			}
-			if (renderHeight !== null) {
-				settings.render_height = renderHeight;
-			}
+			const settings = readSettingsForm();
 			const result = await api("/api/settings", {
 				method: "POST",
 				body: JSON.stringify(settings),

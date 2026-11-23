@@ -654,3 +654,55 @@ class TestToneSettingsRoute:
             client.post("/api/settings", json={"contrast": "abc"}).status_code
             == 400
         )
+
+
+class TestPreviewOverrides:
+    """The preview must run with the form values, before anything is saved."""
+
+    PNG = b"\x89PNG\r\n\x1a\nfake"
+
+    def test_preview_uses_form_values_without_saving(self, client):
+        client.application.renderer_stub.set_preview_png(self.PNG)
+
+        resp = client.get(
+            "/api/debug/rendered-preview"
+            "?saturation=0.2&brightness=1.2&contrast=1.4"
+            "&scale_to_fit=0&render_width=800&render_height=480"
+        )
+
+        assert resp.status_code == 200
+        assert resp.data == self.PNG
+        assert client.application.renderer_stub.preview_overrides == {
+            "saturation": 0.2,
+            "brightness": 1.2,
+            "contrast": 1.4,
+            "scale_to_fit": False,
+            "render_width": 800,
+            "render_height": 480,
+        }
+        # Nothing was persisted by previewing.
+        status = client.get("/api/status").get_json()
+        assert status["contrast"] == 1.0
+        assert status["saturation"] == 0.5
+
+    def test_preview_without_parameters_uses_saved_settings(self, client):
+        client.application.renderer_stub.set_preview_png(self.PNG)
+
+        client.get("/api/debug/rendered-preview")
+
+        assert client.application.renderer_stub.preview_overrides is None
+
+    def test_preview_rejects_an_unparseable_value(self, client):
+        resp = client.get("/api/debug/rendered-preview?contrast=abc")
+
+        assert resp.status_code == 400
+        assert resp.get_json()["error"] == "Invalid contrast"
+
+    def test_preview_clamps_out_of_range_values(self, client):
+        client.application.renderer_stub.set_preview_png(self.PNG)
+
+        client.get("/api/debug/rendered-preview?contrast=9&brightness=0.01")
+
+        overrides = client.application.renderer_stub.preview_overrides
+        assert overrides["contrast"] == 2.0
+        assert overrides["brightness"] == 0.25

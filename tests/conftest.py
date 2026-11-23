@@ -126,8 +126,10 @@ class RendererStub:
         self._render_outcome = "ok"
         self.render_force = False
         self.preview_png: bytes | None = None
+        self.preview_overrides: dict | None = None
 
-    def render_preview_png(self) -> bytes | None:
+    def render_preview_png(self, overrides: dict | None = None) -> bytes | None:
+        self.preview_overrides = overrides
         return self.preview_png
 
     def set_preview_png(self, png: bytes | None) -> None:
