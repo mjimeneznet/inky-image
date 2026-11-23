@@ -14,9 +14,11 @@ class BlockingDisplay:
         self.entered = threading.Event()
         self.release = threading.Event()
         self.rendered: list[str] = []
+        self.kwargs: list[dict] = []
 
-    def display_image_path(self, image_path: str, **_kwargs) -> None:
+    def display_image_path(self, image_path: str, **kwargs) -> None:
         self.rendered.append(image_path)
+        self.kwargs.append(kwargs)
         self.entered.set()
         self.release.wait(5)
 
@@ -152,3 +154,21 @@ def test_force_repaints_the_same_image(app):
 
     assert app.render_current_image(force=True) is True
     assert len(app.display.rendered) == 2, "force must repaint the same image"
+
+
+def test_changing_tone_settings_forces_a_repaint(app):
+    """Brightness and contrast are part of the render signature."""
+    assert app.render_current_image() is True
+    assert len(app.display.rendered) == 1
+    assert app.display.kwargs[-1]["brightness"] == 1.0
+    assert app.display.kwargs[-1]["contrast"] == 1.0
+
+    app.config.set("brightness", 1.2)
+    assert app.render_current_image() is True
+    assert len(app.display.rendered) == 2
+    assert app.display.kwargs[-1]["brightness"] == 1.2
+
+    app.config.set("contrast", 1.4)
+    assert app.render_current_image() is True
+    assert len(app.display.rendered) == 3
+    assert app.display.kwargs[-1]["contrast"] == 1.4

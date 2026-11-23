@@ -429,6 +429,8 @@ async function refreshStatus() {
 		document.getElementById("current-image-name").textContent = status.current_image_name || "No image available";
 		syncField("interval-input", status.slideshow_interval);
 		syncField("saturation-input", status.saturation);
+		syncField("brightness-input", status.brightness);
+		syncField("contrast-input", status.contrast);
 		syncField("scale-to-fit-input", status.scale_to_fit, "checked");
 		syncField("lock-buttons-input", status.lock_buttons, "checked");
 		syncField("high-contrast-input", document.body.classList.contains("high-contrast"), "checked");
@@ -669,6 +671,8 @@ function bindSettingsForm() {
 		await runUiAction(async () => {
 			const interval = numberField("interval-input", 30, 86400);
 			const saturation = numberField("saturation-input", 0, 1);
+			const brightness = numberField("brightness-input", 0.25, 2);
+			const contrast = numberField("contrast-input", 0.25, 2);
 			const scaleToFit = document.getElementById("scale-to-fit-input").checked;
 			const lockButtons = document.getElementById("lock-buttons-input").checked;
 			const renderWidth = numberField("render-width-input", 64, 10000);
@@ -682,6 +686,12 @@ function bindSettingsForm() {
 			}
 			if (saturation !== null) {
 				settings.saturation = saturation;
+			}
+			if (brightness !== null) {
+				settings.brightness = brightness;
+			}
+			if (contrast !== null) {
+				settings.contrast = contrast;
 			}
 			if (renderWidth !== null) {
 				settings.render_width = renderWidth;

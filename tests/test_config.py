@@ -283,3 +283,30 @@ class TestAtomicSave:
 
         loaded = json.loads(cfg_path.read_text(encoding="utf-8"))
         assert len(loaded["selected_images"]) == 500
+
+
+class TestToneSettings:
+    """Brightness and contrast default to a no-op and are clamped."""
+
+    def test_defaults_are_neutral(self, config):
+        assert config.get("brightness") == 1.0
+        assert config.get("contrast") == 1.0
+
+    def test_values_are_clamped_on_load(self, config):
+        """set() is the raw setter; the normalisation happens when loading."""
+        config.set("brightness", 9.0)
+        config.set("contrast", 0.01)
+
+        reloaded = type(config)(str(config.config_path))
+
+        assert reloaded.get("brightness") == 2.0
+        assert reloaded.get("contrast") == 0.25
+
+    def test_values_survive_a_reload(self, config):
+        config.set("brightness", 1.35)
+        config.set("contrast", 0.8)
+
+        reloaded = type(config)(str(config.config_path))
+
+        assert reloaded.get("brightness") == 1.35
+        assert reloaded.get("contrast") == 0.8

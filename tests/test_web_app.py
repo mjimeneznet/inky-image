@@ -613,3 +613,44 @@ class TestRepaintRoute:
 
         assert data["ok"] is False
         assert data["error"] == "Display is busy refreshing; try again."
+
+
+class TestToneSettingsRoute:
+    """POST /api/settings accepts brightness and contrast before dithering."""
+
+    def test_status_exposes_both(self, client):
+        data = client.get("/api/status").get_json()
+
+        assert data["brightness"] == 1.0
+        assert data["contrast"] == 1.0
+
+    def test_saving_both_triggers_a_render(self, client):
+        stub = client.application.renderer_stub
+        before = stub.render_current_image_calls
+
+        data = client.post(
+            "/api/settings", json={"brightness": 1.3, "contrast": 1.2}
+        ).get_json()
+
+        assert data["ok"] is True
+        assert data["settings"]["brightness"] == 1.3
+        assert data["settings"]["contrast"] == 1.2
+        assert stub.render_current_image_calls == before + 1
+
+    def test_values_are_clamped(self, client):
+        data = client.post(
+            "/api/settings", json={"brightness": 5, "contrast": 0.1}
+        ).get_json()
+
+        assert data["settings"]["brightness"] == 2.0
+        assert data["settings"]["contrast"] == 0.25
+
+    def test_invalid_values_are_rejected(self, client):
+        assert (
+            client.post("/api/settings", json={"brightness": "abc"}).status_code
+            == 400
+        )
+        assert (
+            client.post("/api/settings", json={"contrast": "abc"}).status_code
+            == 400
+        )

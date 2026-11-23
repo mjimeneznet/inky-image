@@ -25,6 +25,8 @@ DEFAULT_CONFIG = {
     "slideshow_interval": 30,
     "slideshow_running": False,
     "saturation": 0.5,
+    "brightness": 1.0,
+    "contrast": 1.0,
     "scale_to_fit": True,
     "lock_buttons": False,
     "render_width": 800,
@@ -133,6 +135,10 @@ class ConfigManager:
                 self._data.get("saturation", 0.5), 0.5
             )
             self._data["saturation"] = max(0.0, min(1.0, self._data["saturation"]))
+            # Tone adjustments applied before quantisation; 1.0 is a no-op.
+            for tone_key in ("brightness", "contrast"):
+                value = _safe_float(self._data.get(tone_key, 1.0), 1.0)
+                self._data[tone_key] = max(0.25, min(2.0, value))
             scale_raw = self._data.get("scale_to_fit", True)
             if isinstance(scale_raw, str):
                 self._data["scale_to_fit"] = scale_raw.strip().lower() in {

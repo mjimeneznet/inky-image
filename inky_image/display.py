@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageEnhance, ImageOps
 
 try:
     from inky.auto import auto
@@ -37,6 +37,8 @@ class DisplayManager:
         scale_to_fit: bool = True,
         target_width: int | None = None,
         target_height: int | None = None,
+        brightness: float = 1.0,
+        contrast: float = 1.0,
     ) -> None:
         """Load a file, convert for e-ink and render on screen."""
         path_obj = Path(image_path)
@@ -50,6 +52,8 @@ class DisplayManager:
             scale_to_fit=scale_to_fit,
             target_width=target_width,
             target_height=target_height,
+            brightness=brightness,
+            contrast=contrast,
         )
 
     def display_pil_image(
@@ -59,6 +63,8 @@ class DisplayManager:
         scale_to_fit: bool = True,
         target_width: int | None = None,
         target_height: int | None = None,
+        brightness: float = 1.0,
+        contrast: float = 1.0,
     ) -> None:
         """Process and show a PIL image on Inky display."""
         processed = self._prepare_image(
@@ -66,6 +72,8 @@ class DisplayManager:
             scale_to_fit=scale_to_fit,
             target_width=target_width,
             target_height=target_height,
+            brightness=brightness,
+            contrast=contrast,
         )
         self._show_prepared(processed, saturation)
 
@@ -75,6 +83,8 @@ class DisplayManager:
         scale_to_fit: bool = True,
         target_width: int | None = None,
         target_height: int | None = None,
+        brightness: float = 1.0,
+        contrast: float = 1.0,
     ) -> Image.Image:
         """Load and convert a file exactly as a real render would.
 
@@ -90,6 +100,8 @@ class DisplayManager:
             scale_to_fit=scale_to_fit,
             target_width=target_width,
             target_height=target_height,
+            brightness=brightness,
+            contrast=contrast,
         )
 
     def _show_prepared(self, prepared: Image.Image, saturation: float) -> None:
@@ -104,11 +116,24 @@ class DisplayManager:
         scale_to_fit: bool = True,
         target_width: int | None = None,
         target_height: int | None = None,
+        brightness: float = 1.0,
+        contrast: float = 1.0,
     ) -> Image.Image:
-        """Apply orientation fix, colorspace conversion and resize."""
+        """Apply orientation fix, tone, colorspace conversion and resize.
+
+        Brightness and contrast run before the resize and before the driver
+        quantises the frame: on a seven ink panel they decide which ink each
+        pixel picks, which is the lever that actually makes photos readable.
+        """
         img = ImageOps.exif_transpose(image)
         if img.mode != "RGB":
             img = img.convert("RGB")
+        brightness = max(0.25, min(2.0, float(brightness)))
+        contrast = max(0.25, min(2.0, float(contrast)))
+        if brightness != 1.0:
+            img = ImageEnhance.Brightness(img).enhance(brightness)
+        if contrast != 1.0:
+            img = ImageEnhance.Contrast(img).enhance(contrast)
         width = int(target_width) if target_width is not None else self.width
         height = int(target_height) if target_height is not None else self.height
         width = max(64, width)

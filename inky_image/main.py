@@ -43,7 +43,7 @@ class Application(Renderer):
         self.no_image_path = (
             Path(__file__).resolve().parent.parent / "static" / "no-image.jpg"
         )
-        self._last_render_signature: tuple[str, float, bool, int, int] | None = None
+        self._last_render_signature: tuple | None = None
         self._last_action: dict[str, str] | None = None
         self._action_lock = threading.RLock()
         self._render_in_progress = False
@@ -199,6 +199,8 @@ class Application(Renderer):
                 scale_to_fit=bool(self.config.get("scale_to_fit", True)),
                 target_width=int(self.config.get("render_width", 800)),
                 target_height=int(self.config.get("render_height", 480)),
+                brightness=float(self.config.get("brightness", 1.0)),
+                contrast=float(self.config.get("contrast", 1.0)),
             )
         except Exception as exc:  # pragma: no cover - hardware path
             logger.exception("Preview failed for %s: %s", image_path, exc)
@@ -215,7 +217,17 @@ class Application(Renderer):
         scale_to_fit = bool(self.config.get("scale_to_fit", True))
         render_width = int(self.config.get("render_width", 800))
         render_height = int(self.config.get("render_height", 480))
-        signature = (image_path, saturation, scale_to_fit, render_width, render_height)
+        brightness = float(self.config.get("brightness", 1.0))
+        contrast = float(self.config.get("contrast", 1.0))
+        signature = (
+            image_path,
+            saturation,
+            scale_to_fit,
+            render_width,
+            render_height,
+            brightness,
+            contrast,
+        )
         if not force and self._last_render_signature == signature:
             logger.info("Skipping render for %s (same image and settings)", label)
             return True
@@ -227,6 +239,8 @@ class Application(Renderer):
                 scale_to_fit=scale_to_fit,
                 target_width=render_width,
                 target_height=render_height,
+                brightness=brightness,
+                contrast=contrast,
             )
             self._last_render_signature = signature
             self.config.set("last_rendered_image_path", image_path)

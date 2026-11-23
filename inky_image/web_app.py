@@ -129,6 +129,8 @@ def create_web_app(
         status["slideshow_running"] = slideshow.is_running()
         status["slideshow_interval"] = int(config.get("slideshow_interval", 30))
         status["saturation"] = float(config.get("saturation", 0.5))
+        status["brightness"] = float(config.get("brightness", 1.0))
+        status["contrast"] = float(config.get("contrast", 1.0))
         status["scale_to_fit"] = bool(config.get("scale_to_fit", True))
         status["lock_buttons"] = bool(config.get("lock_buttons", False))
         status["render_width"] = int(config.get("render_width", 800))
@@ -515,6 +517,8 @@ def create_web_app(
         payload = request.get_json(silent=True) or {}
         interval = payload.get("slideshow_interval")
         saturation = payload.get("saturation")
+        brightness = payload.get("brightness")
+        contrast = payload.get("contrast")
         scale_to_fit = payload.get("scale_to_fit")
         lock_buttons = payload.get("lock_buttons")
         render_width = payload.get("render_width")
@@ -533,6 +537,16 @@ def create_web_app(
                 updates["saturation"] = max(0.0, min(1.0, float(saturation)))
             except (ValueError, TypeError):
                 return jsonify({"ok": False, "error": "Invalid saturation"}), 400
+        if brightness is not None:
+            try:
+                updates["brightness"] = max(0.25, min(2.0, float(brightness)))
+            except (ValueError, TypeError):
+                return jsonify({"ok": False, "error": "Invalid brightness"}), 400
+        if contrast is not None:
+            try:
+                updates["contrast"] = max(0.25, min(2.0, float(contrast)))
+            except (ValueError, TypeError):
+                return jsonify({"ok": False, "error": "Invalid contrast"}), 400
         if scale_to_fit is not None:
             if isinstance(scale_to_fit, bool):
                 updates["scale_to_fit"] = scale_to_fit
@@ -559,6 +573,8 @@ def create_web_app(
             config.update(updates)
             if (
                 "saturation" in updates
+                or "brightness" in updates
+                or "contrast" in updates
                 or "scale_to_fit" in updates
                 or "render_width" in updates
                 or "render_height" in updates
