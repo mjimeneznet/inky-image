@@ -1,3 +1,5 @@
+// Inside this factory the object main.js keeps is not called `browser`;
+// call the local helpers directly or the handler throws a ReferenceError.
 export function createBrowser({ state, api, getActiveMode, previews, showMessage }) {
 	let browserSelectionByNavigationKey = false;
 
@@ -133,7 +135,7 @@ export function createBrowser({ state, api, getActiveMode, previews, showMessage
 				}
 				event.preventDefault();
 				browserSelectionByNavigationKey = false;
-				await browser.loadDirectoryBrowser(entry.path);
+				await loadDirectoryBrowser(entry.path);
 				return;
 			}
 			if (event.key === "ArrowLeft") {
@@ -143,7 +145,7 @@ export function createBrowser({ state, api, getActiveMode, previews, showMessage
 				}
 				event.preventDefault();
 				browserSelectionByNavigationKey = false;
-				await browser.loadDirectoryBrowser(parentPath);
+				await loadDirectoryBrowser(parentPath);
 				return;
 			}
 			if (event.key !== "Enter") {
@@ -158,7 +160,7 @@ export function createBrowser({ state, api, getActiveMode, previews, showMessage
 				return;
 			}
 			event.preventDefault();
-			await browser.loadDirectoryBrowser(entry.path);
+			await loadDirectoryBrowser(entry.path);
 		};
 
 		browserSelect.ondblclick = async () => {
@@ -170,7 +172,7 @@ export function createBrowser({ state, api, getActiveMode, previews, showMessage
 			if (!entry || entry.type !== "directory") {
 				return;
 			}
-			await browser.loadDirectoryBrowser(entry.path);
+			await loadDirectoryBrowser(entry.path);
 		};
 
 		browserSelect.onchange = async () => {
@@ -186,7 +188,7 @@ export function createBrowser({ state, api, getActiveMode, previews, showMessage
 				return;
 			}
 			state.browserState.selectedEntry = entry;
-			browser.updateAddButtonState();
+			updateAddButtonState();
 			if (entry.type === "image") {
 				browserSelectionByNavigationKey = false;
 				state.selectedPreviewPath = entry.path;
@@ -202,7 +204,7 @@ export function createBrowser({ state, api, getActiveMode, previews, showMessage
 			browserSelectionByNavigationKey = false;
 			state.selectedPreviewPath = null;
 			previews.refreshSelectedPreviewImage();
-			await browser.loadDirectoryBrowser(entry.path);
+			await loadDirectoryBrowser(entry.path);
 		};
 
 		document.getElementById("browser-filter-input").oninput = () => {

@@ -183,3 +183,31 @@ class TestDisplayManagerImagePreparation:
         assert ImageOps.fit.call_count == 2
         assert ImageOps.fit.call_args_list[0].args[1] == (64, 64)
         assert ImageOps.fit.call_args_list[1].args[1] == (100, 100)
+
+
+class TestBrowserModuleScope:
+    """browser.js must call its own closure helpers, not the owner object.
+
+    ``createBrowser()`` returns an object that main.js keeps as ``browser``,
+    but that name does not exist inside the factory. A handler written as
+    ``browser.loadDirectoryBrowser(...)`` throws a ReferenceError the moment
+    the user clicks, which is exactly what made the directory list
+    unnavigable while every test and every other route stayed green.
+    """
+
+    def test_handlers_do_not_reference_an_owner_object(self):
+        import re
+        from pathlib import Path
+
+        source = Path(__file__).resolve().parent.parent / "static" / "js"
+        text = (source / "browser.js").read_text(encoding="utf-8")
+        offenders = [
+            f"browser.js:{number}"
+            for number, line in enumerate(text.splitlines(), start=1)
+            if re.search(r"(?<![\w.$])browser\.\w+\s*\(", line)
+        ]
+
+        assert offenders == [], (
+            "browser.js calls a `browser` object it does not have: "
+            f"{offenders}"
+        )
