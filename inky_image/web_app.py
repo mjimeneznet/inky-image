@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import time
 from collections import deque
+from io import BytesIO
 from pathlib import Path
 from typing import Callable
 
@@ -601,6 +602,16 @@ def create_web_app(
                 }
             )
         return _render_response(image_manager, renderer.render_current_image())
+
+    @app.get("/api/debug/rendered-preview")
+    def rendered_preview():
+        """Return the frame the pipeline would send, without touching the panel."""
+        png = renderer.render_preview_png()
+        if not png:
+            return jsonify({"ok": False, "error": "No image to preview"}), 404
+        response = send_file(BytesIO(png), mimetype="image/png")
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.get("/api/current-image")
     def current_image():

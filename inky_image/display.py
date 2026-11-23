@@ -67,8 +67,35 @@ class DisplayManager:
             target_width=target_width,
             target_height=target_height,
         )
+        self._show_prepared(processed, saturation)
+
+    def prepare_image_path(
+        self,
+        image_path: str,
+        scale_to_fit: bool = True,
+        target_width: int | None = None,
+        target_height: int | None = None,
+    ) -> Image.Image:
+        """Load and convert a file exactly as a real render would.
+
+        Split out so a caller can inspect the frame without touching the panel.
+        """
+        path_obj = Path(image_path)
+        if not path_obj.exists():
+            raise FileNotFoundError(f"Image not found: {image_path}")
+        with Image.open(path_obj) as source:
+            image = source.copy()
+        return self._prepare_image(
+            image,
+            scale_to_fit=scale_to_fit,
+            target_width=target_width,
+            target_height=target_height,
+        )
+
+    def _show_prepared(self, prepared: Image.Image, saturation: float) -> None:
+        """Quantise an already prepared frame and push it to the panel."""
         saturation = max(0.0, min(1.0, float(saturation)))
-        self._display.set_image(processed, saturation=saturation)
+        self._display.set_image(prepared, saturation=saturation)
         self._display.show()
 
     def _prepare_image(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import logging
 import signal
 import threading
@@ -181,6 +182,30 @@ class Application(Renderer):
     def last_render_outcome(self) -> str:
         """Return how the last render on this thread ended."""
         return getattr(self._render_outcome, "value", "ok")
+
+    def render_preview_png(self) -> bytes | None:
+        """Return the frame the pipeline would send, without touching the panel.
+
+        Diagnostic only: it runs the same sizing, padding and colour path as a
+        real render, so a washed out result here means the pipeline is the
+        problem and a crisp one points at the panel or its palette step.
+        """
+        image_path = self.image_manager.current_image_path()
+        if not image_path:
+            return None
+        try:
+            prepared = self.display.prepare_image_path(
+                image_path,
+                scale_to_fit=bool(self.config.get("scale_to_fit", True)),
+                target_width=int(self.config.get("render_width", 800)),
+                target_height=int(self.config.get("render_height", 480)),
+            )
+        except Exception as exc:  # pragma: no cover - hardware path
+            logger.exception("Preview failed for %s: %s", image_path, exc)
+            return None
+        buffer = io.BytesIO()
+        prepared.save(buffer, format="PNG")
+        return buffer.getvalue()
 
     def _render_image_path_locked(
         self, image_path: str, label: str, force: bool = False

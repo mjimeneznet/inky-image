@@ -35,6 +35,10 @@ class Renderer(ABC):
         """Return True when a display refresh is in progress."""
         return False
 
+    def render_preview_png(self) -> bytes | None:
+        """Return the frame the pipeline would send, without touching the panel."""
+        return None
+
     def last_render_outcome(self) -> str:
         """Return how the last render on this thread ended.
 

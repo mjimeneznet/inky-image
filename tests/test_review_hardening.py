@@ -211,3 +211,25 @@ class TestBrowserModuleScope:
             "browser.js calls a `browser` object it does not have: "
             f"{offenders}"
         )
+
+
+class TestRenderedPreviewRoute:
+    """GET /api/debug/rendered-preview exposes the pipeline frame read-only."""
+
+    def test_serves_the_pipeline_frame(self, client):
+        png = b"\x89PNG\r\n\x1a\nfake-frame"
+        client.application.renderer_stub.set_preview_png(png)
+
+        resp = client.get("/api/debug/rendered-preview")
+
+        assert resp.status_code == 200
+        assert resp.mimetype == "image/png"
+        assert resp.data == png
+
+    def test_reports_no_frame(self, client):
+        client.application.renderer_stub.set_preview_png(None)
+
+        resp = client.get("/api/debug/rendered-preview")
+
+        assert resp.status_code == 404
+        assert resp.get_json()["error"] == "No image to preview"

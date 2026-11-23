@@ -125,6 +125,14 @@ class RendererStub:
         self._render_in_progress = False
         self._render_outcome = "ok"
         self.render_force = False
+        self.preview_png: bytes | None = None
+
+    def render_preview_png(self) -> bytes | None:
+        return self.preview_png
+
+    def set_preview_png(self, png: bytes | None) -> None:
+        """Drive the diagnostic preview route."""
+        self.preview_png = png
 
     def _record_render(self) -> bool:
         """Report whether the simulated refresh reached the panel."""
