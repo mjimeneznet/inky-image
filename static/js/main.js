@@ -386,7 +386,11 @@ function applyModeUiState(status) {
 // typed interval would silently revert mid-entry.
 function syncField(id, value, prop) {
 	const element = document.getElementById(id);
-	if (!element || element === document.activeElement) {
+	if (
+		!element ||
+		element === document.activeElement ||
+		state.dirtySettings.has(id)
+	) {
 		return;
 	}
 	if (prop === "checked") {
@@ -673,6 +677,13 @@ function bindDisplayControls() {
 // The three controls form a chain: the strategy decides who dithers, the
 // palette only matters to the custom strategies, and the hex list only to the
 // Custom palette. Saturation belongs to Default, which is the driver's blend.
+function markSettingsDirty(event) {
+	const id = event && event.target && event.target.id;
+	if (id) {
+		state.dirtySettings.add(id);
+	}
+}
+
 function applyRenderModeDependencies() {
 	const modeSelect = document.getElementById("render-mode-input");
 	const paletteSelect = document.getElementById("panel-palette-input");
@@ -785,6 +796,11 @@ async function refreshPanelPreview() {
 }
 
 function bindSettingsForm() {
+	const settingsPanel = document.getElementById("settings-panel");
+	if (settingsPanel) {
+		settingsPanel.addEventListener("input", markSettingsDirty);
+		settingsPanel.addEventListener("change", markSettingsDirty);
+	}
 	document.getElementById("refresh-preview-button").onclick = () => {
 		refreshPanelPreview();
 	};
@@ -808,6 +824,10 @@ function bindSettingsForm() {
 			} else {
 				feedback.showBadge("Settings saved", "success");
 			}
+			// The server now holds exactly what the form showed, so the poll can
+			// take over again without undoing anything.
+			state.dirtySettings.clear();
+			applyRenderModeDependencies();
 			refreshPanelPreview();
 			await refreshStatus();
 		}, { startMessage: "Saving settings..." });

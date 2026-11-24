@@ -23,5 +23,9 @@ export function createState() {
 		listPreviewValue: "",
 		listPreviewRenderToken: "",
 		lastActionTs: null,
+		// Settings the user changed but has not saved yet: the poll must not
+		// overwrite them, and focus alone is not enough because focus moves to
+		// the next control the moment you click another field.
+		dirtySettings: new Set(),
 	};
 }
