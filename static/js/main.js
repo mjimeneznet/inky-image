@@ -434,6 +434,7 @@ async function refreshStatus() {
 		syncField("render-mode-input", status.render_mode || "default");
 		syncField("panel-palette-input", status.panel_palette || "driver");
 		syncField("panel-palette-custom-input", status.panel_palette_custom || "");
+		applyRenderModeDependencies();
 		syncField("scale-to-fit-input", status.scale_to_fit, "checked");
 		syncField("lock-buttons-input", status.lock_buttons, "checked");
 		syncField("high-contrast-input", document.body.classList.contains("high-contrast"), "checked");
@@ -669,6 +670,26 @@ function bindDisplayControls() {
 	};
 }
 
+// The three controls form a chain: the strategy decides who dithers, the
+// palette only matters to the custom strategies, and the hex list only to the
+// Custom palette. Saturation belongs to Default, which is the driver's blend.
+function applyRenderModeDependencies() {
+	const modeSelect = document.getElementById("render-mode-input");
+	const paletteSelect = document.getElementById("panel-palette-input");
+	const customInput = document.getElementById("panel-palette-custom-input");
+	const saturationInput = document.getElementById("saturation-input");
+	if (!modeSelect || !paletteSelect || !customInput || !saturationInput) {
+		return;
+	}
+	const customStrategy = modeSelect.value !== "default";
+	paletteSelect.disabled = !customStrategy;
+	customInput.disabled = !customStrategy || paletteSelect.value !== "custom";
+	saturationInput.disabled = customStrategy;
+	saturationInput.title = customStrategy
+		? "Only used by Default, which blends the driver palettes. The custom strategies match the palette above."
+		: "";
+}
+
 function readSettingsForm() {
 	const settings = {
 		scale_to_fit: document.getElementById("scale-to-fit-input").checked,
@@ -767,6 +788,13 @@ function bindSettingsForm() {
 	document.getElementById("refresh-preview-button").onclick = () => {
 		refreshPanelPreview();
 	};
+	document.getElementById("render-mode-input").onchange = () => {
+		applyRenderModeDependencies();
+	};
+	document.getElementById("panel-palette-input").onchange = () => {
+		applyRenderModeDependencies();
+	};
+	applyRenderModeDependencies();
 	document.getElementById("save-settings-button").onclick = async () => {
 		await runUiAction(async () => {
 			const settings = readSettingsForm();

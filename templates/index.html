@@ -157,16 +157,16 @@
 			</select>
 			<p class="setting-hint">Default hands the frame to the driver, which blends the palette by the saturation value and dithers once. The other two convert here and pass a P image so the driver copies it untouched; Oklab matches inks by perceptual distance and sharpens edges first. Compare them with Refresh preview before saving. Saturation only affects Default.</p>
 
-			<label for="panel-palette-input">Panel ink palette (custom strategies only)</label>
+			<label for="panel-palette-input">Panel ink palette (only the two custom strategies use it)</label>
 			<select id="panel-palette-input">
 				<option value="driver">Driver measured inks</option>
 				<option value="pure">Pure primaries</option>
 				<option value="custom">Custom (paste measured inks)</option>
 			</select>
-			<label for="panel-palette-custom-input">Custom inks: seven hex values</label>
+			<label for="panel-palette-custom-input">Custom inks (only when Panel ink palette = Custom)</label>
 			<input id="panel-palette-custom-input" type="text"
 				placeholder="#000000, #ffffff, #00ff00, #0000ff, #ff0000, #ffff00, #ff8c00">
-			<p class="setting-hint">Order matters: black, white, green, blue, red, yellow, orange, which is the driver's ink order. Only the two custom dithering strategies use this list; Default keeps the driver's own palette blend.</p>
+			<p class="setting-hint">Seven hex values in the driver's ink order: black, white, green, blue, red, yellow, orange. They are the colours the dithered output is matched against, so copy the ones you measured on your panel.</p>
 
 			<label for="brightness-input">Brightness before dithering (1.0 = unchanged)</label>
 			<input id="brightness-input" type="number" min="0.25" max="2" step="0.05">
