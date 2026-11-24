@@ -687,18 +687,20 @@ function markSettingsDirty(event) {
 function applyRenderModeDependencies() {
 	const modeSelect = document.getElementById("render-mode-input");
 	const paletteSelect = document.getElementById("panel-palette-input");
-	const customInput = document.getElementById("panel-palette-custom-input");
-	const saturationInput = document.getElementById("saturation-input");
-	if (!modeSelect || !paletteSelect || !customInput || !saturationInput) {
+	const saturationGroup = document.getElementById("saturation-group");
+	const paletteGroup = document.getElementById("palette-group");
+	const customGroup = document.getElementById("custom-palette-group");
+	if (!modeSelect || !paletteSelect || !saturationGroup || !paletteGroup) {
 		return;
 	}
+	// Default dithers in the driver and is tuned by saturation; the custom
+	// strategies dither here and are tuned by the ink palette instead.
 	const customStrategy = modeSelect.value !== "default";
-	paletteSelect.disabled = !customStrategy;
-	customInput.disabled = !customStrategy || paletteSelect.value !== "custom";
-	saturationInput.disabled = customStrategy;
-	saturationInput.title = customStrategy
-		? "Only used by Default, which blends the driver palettes. The custom strategies match the palette above."
-		: "";
+	saturationGroup.hidden = customStrategy;
+	paletteGroup.hidden = !customStrategy;
+	if (customGroup) {
+		customGroup.hidden = !customStrategy || paletteSelect.value !== "custom";
+	}
 }
 
 function readSettingsForm() {

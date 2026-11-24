@@ -142,54 +142,104 @@
 
 		<section id="settings-panel" class="panel settings-panel">
 			<h2>Settings</h2>
-			<label for="interval-input">Slideshow interval (seconds)</label>
+
+			<h3>Slideshow</h3>
+			<div class="setting-head">
+				<label for="interval-input">Interval (seconds)</label>
+				<span class="help" tabindex="0" role="note" aria-label="About the interval">?
+					<span class="help-text" role="tooltip">Range 30 - 86400. Each step waits for a full panel refresh (15-20 s), so shorter intervals are refused.</span>
+				</span>
+			</div>
 			<input id="interval-input" type="number" min="30" max="86400" step="1">
-			<p class="setting-hint">Range 30 - 86400. Each step waits for a full panel refresh (15-20 s), so shorter intervals are refused.</p>
 
-			<label for="saturation-input">Inky saturation (0 = pure vivid palette, 1 = muted ink palette)</label>
-			<input id="saturation-input" type="number" min="0" max="1" step="0.1">
-			<p class="setting-hint">Range 0 - 1, step 0.1. This is a palette blend, not photo saturation: 0 quantises to pure primaries (more punch, cruder), 1 to the panel's measured inks (softer, more faithful). 0.5 is Pimoroni's default. Lower it if colours look dull.</p>
-			<label for="render-mode-input">Dithering strategy</label>
+			<h3>Dithering</h3>
+			<div class="setting-head">
+				<label for="render-mode-input">Strategy</label>
+				<span class="help" tabindex="0" role="note" aria-label="About the dithering strategies">?
+					<span class="help-text" role="tooltip">Default hands the frame to the driver, which blends its two palettes by the saturation value and dithers once. The other two convert here and pass a P image so the driver copies it untouched: Palette matches the measured inks with Floyd-Steinberg, Oklab matches them by perceptual distance and sharpens edges first. Compare them with Refresh preview before saving.</span>
+				</span>
+			</div>
 			<select id="render-mode-input">
-				<option value="default">Default (driver dithering, keeps the current look)</option>
-				<option value="palette">Own dithering, measured inks (P mode, no second pass)</option>
-				<option value="oklab">Perceptual Oklab + sharpening (best for photos)</option>
+				<option value="default">Default (driver dithering)</option>
+				<option value="palette">Own dithering, measured inks (P mode)</option>
+				<option value="oklab">Perceptual Oklab + sharpening</option>
 			</select>
-			<p class="setting-hint">Default hands the frame to the driver, which blends the palette by the saturation value and dithers once. The other two convert here and pass a P image so the driver copies it untouched; Oklab matches inks by perceptual distance and sharpens edges first. Compare them with Refresh preview before saving. Saturation only affects Default.</p>
 
-			<label for="panel-palette-input">Panel ink palette (only the two custom strategies use it)</label>
-			<select id="panel-palette-input">
-				<option value="driver">Driver measured inks</option>
-				<option value="pure">Pure primaries</option>
-				<option value="custom">Custom (paste measured inks)</option>
-			</select>
-			<label for="panel-palette-custom-input">Custom inks (only when Panel ink palette = Custom)</label>
-			<input id="panel-palette-custom-input" type="text"
-				placeholder="#000000, #ffffff, #00ff00, #0000ff, #ff0000, #ffff00, #ff8c00">
-			<p class="setting-hint">Seven hex values in the driver's ink order: black, white, green, blue, red, yellow, orange. They are the colours the dithered output is matched against, so copy the ones you measured on your panel.</p>
+			<div id="saturation-group" class="setting-group">
+				<div class="setting-head">
+					<label for="saturation-input">Inky saturation</label>
+					<span class="help" tabindex="0" role="note" aria-label="About the saturation setting">?
+						<span class="help-text" role="tooltip">Range 0 - 1, step 0.1. This is a palette blend, not photo saturation: 0 quantises to pure primaries (more punch, cruder), 1 to the panel's measured inks (softer, more faithful). 0.5 is Pimoroni's default. Lower it if colours look dull.</span>
+					</span>
+				</div>
+				<input id="saturation-input" type="number" min="0" max="1" step="0.1">
+			</div>
 
-			<label for="brightness-input">Brightness before dithering (1.0 = unchanged)</label>
+			<div id="palette-group" class="setting-group">
+				<div class="setting-head">
+					<label for="panel-palette-input">Panel ink palette</label>
+					<span class="help" tabindex="0" role="note" aria-label="About the ink palette">?
+						<span class="help-text" role="tooltip">The inks the dithered output is matched against. Driver uses the panel's measured colours, Pure uses the theoretical primaries, Custom lets you paste the values you measured yourself.</span>
+					</span>
+				</div>
+				<select id="panel-palette-input">
+					<option value="driver">Driver measured inks</option>
+					<option value="pure">Pure primaries</option>
+					<option value="custom">Custom (paste measured inks)</option>
+				</select>
+
+				<div id="custom-palette-group" class="setting-group">
+					<div class="setting-head">
+						<label for="panel-palette-custom-input">Custom inks</label>
+						<span class="help" tabindex="0" role="note" aria-label="About the custom ink values">?
+							<span class="help-text" role="tooltip">Seven hex values in the driver's ink order: black, white, green, blue, red, yellow, orange. They are the colours the output is matched against, so copy the ones you measured on your panel.</span>
+						</span>
+					</div>
+					<input id="panel-palette-custom-input" type="text"
+						placeholder="#000000, #ffffff, #00ff00, #0000ff, #ff0000, #ffff00, #ff8c00">
+				</div>
+			</div>
+
+			<h3>Tone</h3>
+			<div class="setting-head">
+				<label for="brightness-input">Brightness</label>
+				<span class="help" tabindex="0" role="note" aria-label="About brightness">?
+					<span class="help-text" role="tooltip">Range 0.25 - 2.0, step 0.05, 1.0 leaves the photo alone. Moves the whole frame lighter or darker before the panel picks inks. Raise to 1.1 - 1.2 when a photo looks grey; go back to 1.0 if whites start to glare.</span>
+				</span>
+			</div>
 			<input id="brightness-input" type="number" min="0.25" max="2" step="0.05">
-			<p class="setting-hint">Range 0.25 - 2.0, step 0.05. Moves the whole photo lighter or darker before the panel picks inks. Raise to 1.1 - 1.2 when a photo looks grey; go back to 1.0 if whites start to glare.</p>
-			<label for="contrast-input">Contrast before dithering (1.0 = unchanged)</label>
-			<input id="contrast-input" type="number" min="0.25" max="2" step="0.05">
-			<p class="setting-hint">Range 0.25 - 2.0, step 0.05. Spreads light and dark before ink selection, which is what separates similar tones. 1.2 - 1.4 usually helps photos; above 1.5 shadows start to block up.</p>
 
+			<div class="setting-head">
+				<label for="contrast-input">Contrast</label>
+				<span class="help" tabindex="0" role="note" aria-label="About contrast">?
+					<span class="help-text" role="tooltip">Range 0.25 - 2.0, step 0.05, 1.0 leaves the photo alone. Spreads light and dark before ink selection, which is what separates similar tones. 1.2 - 1.4 usually helps photos; above 1.5 shadows start to block up.</span>
+				</span>
+			</div>
+			<input id="contrast-input" type="number" min="0.25" max="2" step="0.05">
+
+			<h3>Display</h3>
 			<div class="row setting-toggle">
 				<input id="scale-to-fit-input" type="checkbox">
-				<label for="scale-to-fit-input">Crop to fill screen (unchecked: whole image, white borders)</label>
+				<label for="scale-to-fit-input">Crop to fill screen</label>
+				<span class="help" tabindex="0" role="note" aria-label="About cropping">?
+					<span class="help-text" role="tooltip">Checked: the photo fills the panel and its edges are cropped. Unchecked: the whole photo fits inside, padded with white (the brightest surface on screen).</span>
+				</span>
 			</div>
-			<p class="setting-hint">Checked: the photo fills the panel and its edges are cropped. Unchecked: the whole photo fits inside, padded with white (the brightest surface on screen).</p>
 			<div class="row setting-toggle">
 				<input id="lock-buttons-input" type="checkbox">
 				<label for="lock-buttons-input">Lock physical buttons (A/B/C/D)</label>
+				<span class="help" tabindex="0" role="note" aria-label="About the button lock">?
+					<span class="help-text" role="tooltip">Ignores A/B/C/D on the panel, so nothing changes while you are away. The web controls keep working.</span>
+				</span>
 			</div>
-			<p class="setting-hint">Ignores A/B/C/D on the panel, so nothing changes while you are away. The web controls keep working.</p>
 			<div class="row setting-toggle">
 				<input id="high-contrast-input" type="checkbox">
 				<label for="high-contrast-input">High contrast mode</label>
+				<span class="help" tabindex="0" role="note" aria-label="About high contrast mode">?
+					<span class="help-text" role="tooltip">Browser UI only: a darker page with brighter text. It does not change what the panel shows.</span>
+				</span>
 			</div>
-			<p class="setting-hint">Browser UI only (dark page, brighter text). It does not change what the panel shows.</p>
+
 			<h3>Render</h3>
 			<div class="row render-size-row">
 				<input id="render-width-input" type="number" min="64" max="10000" step="1"
@@ -201,10 +251,13 @@
 
 			<button id="save-settings-button">Save settings</button>
 
-			<h3>Panel preview</h3>
+			<h3>Panel preview
+				<span class="help" tabindex="0" role="note" aria-label="About the panel preview">?
+					<span class="help-text" role="tooltip">Dithered with the values currently in the form, saved or not: adjust the fields, press Refresh preview to compare without touching the panel, then Save settings to apply. Zoom to 100 % to see the real dot pattern.</span>
+				</span>
+			</h3>
 			<img id="panel-preview" class="panel-preview" alt="Dithered preview of the current image">
 			<p id="panel-preview-status" class="setting-hint" role="status"></p>
-			<p class="setting-hint">Dithered with the values currently in the form, saved or not: adjust the fields, press Refresh preview to compare without touching the panel, then Save settings to apply. Zoom to 100 % to see the real dot pattern.</p>
 			<button id="refresh-preview-button" type="button">Refresh preview</button>
 			<pre id="status-output"></pre>
 		</section>
