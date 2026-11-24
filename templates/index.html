@@ -190,11 +190,14 @@
 				<label for="high-contrast-input">High contrast mode</label>
 			</div>
 			<p class="setting-hint">Browser UI only (dark page, brighter text). It does not change what the panel shows.</p>
-			<label for="render-width-input">Render width (pixels)</label>
-			<input id="render-width-input" type="number" min="64" max="10000" step="1">
-			<label for="render-height-input">Render height (pixels)</label>
-			<input id="render-height-input" type="number" min="64" max="10000" step="1">
-			<p class="setting-hint">Range 64 - 10000. Frame size before the panel scales it to its own 800 x 480. Keep both at the panel size: any other value only adds a second resize and softens the image.</p>
+			<h3>Render</h3>
+			<div class="row render-size-row">
+				<input id="render-width-input" type="number" min="64" max="10000" step="1"
+					aria-label="Render width in pixels">
+				<span class="render-size-separator">&times;</span>
+				<input id="render-height-input" type="number" min="64" max="10000" step="1"
+					aria-label="Render height in pixels">
+			</div>
 
 			<button id="save-settings-button">Save settings</button>
 
