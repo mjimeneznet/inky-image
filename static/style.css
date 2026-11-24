@@ -454,6 +454,10 @@ h2 {
 	display: block;
 }
 
+.panel-preview:not([src]) {
+	display: none;
+}
+
 .setting-hint {
 	margin: 4px 0 14px;
 	font-size: 0.82rem;
